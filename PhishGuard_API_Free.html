@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhishGuard &bull; Phishing URL & Domain Threat Classifier</title>
+    <script src="vendor/tailwind.cdn.js"></script>
+    <script src="vendor/jsQR.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['system-ui', 'Segoe UI', 'sans-serif'],
+                        mono: ['Consolas', 'monospace']
+                    },
+                    colors: {
+                        cyber: {
+                            black: '#070b14',
+                            dark: '#0c1322',
+                            surface: '#131d31',
+                            card: '#18243d',
+                            border: '#233554',
+                            blue: '#3b82f6',
+                            cyan: '#06b6d4',
+                            emerald: '#10b981',
+                            amber: '#f59e0b',
+                            rose: '#f43f5e',
+                            crimson: '#e11d48'
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        .gauge-circle {
+            transition: stroke-dashoffset 0.85s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s ease;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0c1322; }
+        ::-webkit-scrollbar-thumb { background: #233554; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
+    </style>
+</head>
+<body class="bg-cyber-black text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+
+    <header class="border-b border-cyber-border/80 bg-cyber-dark/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-bold tracking-tight text-white">PhishGuard <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/30">v3.2 SOC</span></h1>
+                    </div>
+                    <p class="text-xs text-slate-400">API-Free Local Threat Classifier, IDN/Unicode Unmasker, QR Forensics & SOC Analysis</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 text-xs font-mono">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-cyber-surface border border-cyber-border text-slate-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-2"></span> Engine Ready
+                </span>
+                <span class="hidden md:inline-flex items-center px-2.5 py-1 rounded-md bg-cyber-surface border border-cyber-border text-slate-400">
+                    API-Free Local Engine
+                </span>
+                <span id="offlineStatus" class="inline-flex items-center px-2.5 py-1 rounded-md bg-cyber-surface border border-cyber-border text-slate-400" role="status">
+                    Offline assets bundled
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+        <!-- Global SOC Metric Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+            <div class="p-3.5 rounded-xl bg-cyber-dark border border-cyber-border flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Total Scans</div>
+                    <div id="statTotalScans" class="text-xl font-bold font-mono text-white mt-0.5">0</div>
+                </div>
+                <div class="p-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-cyber-dark border border-cyber-border flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">High Risk Detected</div>
+                    <div id="statHighRisk" class="text-xl font-bold font-mono text-rose-400 mt-0.5">0</div>
+                </div>
+                <div class="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-cyber-dark border border-cyber-border flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Clean / Safe Rate</div>
+                    <div id="statCleanRate" class="text-xl font-bold font-mono text-emerald-400 mt-0.5">100%</div>
+                </div>
+                <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-cyber-dark border border-cyber-border flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Avg Shannon Entropy</div>
+                    <div id="statAvgEntropy" class="text-xl font-bold font-mono text-cyan-400 mt-0.5">0.00</div>
+                </div>
+                <div class="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-3 text-xs text-slate-300">
+            <strong class="text-cyan-300">Privacy & accuracy:</strong> URL and email checks run in this browser; URL scan history is stored in this browser. No reputation lookup is made and scan contents are not sent to a threat-intelligence provider. Results are heuristic indicators, not proof that a link is safe or malicious.
+        </div>
+
+        <div class="flex flex-wrap border-b border-cyber-border">
+            <button id="singleScanTab" onclick="switchTab('single')" class="px-5 py-2.5 text-sm font-semibold border-b-2 border-cyan-400 text-cyan-300 flex items-center gap-2 transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                Single URL Threat Inspection
+            </button>
+            <button id="qrScanTab" onclick="switchTab('qr')" class="px-5 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                Quishing (QR Code) Scanner
+            </button>
+            <button id="batchScanTab" onclick="switchTab('batch')" class="px-5 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                Batch Audit & CSV Export
+            </button>
+            <button id="emailScanTab" onclick="switchTab('email')" class="px-5 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition-all">
+                Email Analyzer
+            </button>
+            <button id="testAuditTab" onclick="switchTab('tests')" class="px-5 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition-all">
+                Detection Test Lab
+            </button>
+        </div>
+
+        <!-- ==================== TAB 1: SINGLE SCAN VIEW ==================== -->
+        <div id="singleView" class="space-y-6">
+            <section class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                <form id="urlScanForm" class="space-y-3" onsubmit="event.preventDefault(); triggerSingleScan();">
+                    <label for="urlInput" class="block text-xs uppercase tracking-wider font-semibold text-slate-300">
+                        Target Uniform Resource Locator (URL) or Hostname
+                    </label>
+                    <div class="flex flex-col sm:flex-row gap-2.5">
+                        <div class="relative flex-1">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                                </svg>
+                            </div>
+                            <input type="text" id="urlInput" placeholder="https://secure-login.paypal.verify-account.top/auth/signin?token=..." 
+                                class="w-full pl-10 pr-4 py-3 rounded-xl bg-cyber-surface border border-cyber-border text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-sm font-mono transition-all">
+                        </div>
+                        <button type="submit" id="scanBtn" class="px-7 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold text-sm shadow-lg shadow-cyan-600/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 whitespace-nowrap">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                            Inspect Threat
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Preset Test Samples -->
+                <div class="mt-4 pt-3.5 border-t border-cyber-border/60">
+                    <div class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 mb-2 flex items-center gap-1.5">
+                        <span>Quick Test Payloads:</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 text-xs font-mono">
+                        <button type="button" onclick="loadPreset('https://www.google.com')" class="px-2.5 py-1 rounded-lg bg-cyber-surface hover:bg-cyber-card border border-cyber-border text-emerald-400 hover:border-emerald-500/40 transition-all">Legitimate (Google)</button>
+                        <button type="button" onclick="loadPreset('http://paypa1.com.account-update.xyz/login')" class="px-2.5 py-1 rounded-lg bg-cyber-surface hover:bg-cyber-card border border-cyber-border text-rose-400 hover:border-rose-500/40 transition-all">Typosquat (PayPal)</button>
+                        <button type="button" onclick="loadPreset('http://192.168.1.105/banking/signin.php')" class="px-2.5 py-1 rounded-lg bg-cyber-surface hover:bg-cyber-card border border-cyber-border text-amber-400 hover:border-amber-500/40 transition-all">Direct IP Host</button>
+                        <button type="button" onclick="loadPreset('https://pаypal.com/signin')" class="px-2.5 py-1 rounded-lg bg-cyber-surface hover:bg-cyber-card border border-cyber-border text-rose-400 hover:border-rose-500/40 transition-all">Cyrillic Homoglyph</button>
+                        <button type="button" onclick="loadPreset('http://legit-brand.com@evil-phish.net/login')" class="px-2.5 py-1 rounded-lg bg-cyber-surface hover:bg-cyber-card border border-cyber-border text-rose-400 hover:border-rose-500/40 transition-all">@ Userinfo Obfuscation</button>
+                        <button type="button" onclick="loadPreset('https://auth-netflix-renewal.account-protection.service.top/confirm-billing')" class="px-2.5 py-1 rounded-lg bg-cyber-surface hover:bg-cyber-card border border-cyber-border text-rose-400 hover:border-rose-500/40 transition-all">Deep Subdomain Abuse</button>
+                    </div>
+                </div>
+            </section>
+
+            <div id="resultContainer" class="hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Gauge and Verdict Card -->
+                    <div class="p-6 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl flex flex-col items-center justify-center text-center relative overflow-hidden">
+                        <div class="absolute -right-12 -top-12 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        <div class="relative w-44 h-44 flex items-center justify-center mb-4">
+                            <svg class="w-full h-full" viewBox="0 0 120 120">
+                                <circle cx="60" cy="60" r="50" fill="none" stroke="#1e293b" stroke-width="10"></circle>
+                                <circle id="gaugeProgress" class="gauge-circle" cx="60" cy="60" r="50" fill="none" stroke="#10b981" stroke-width="10" stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="314.16"></circle>
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span id="gaugeScoreText" class="text-4xl font-extrabold font-mono text-white">0</span>
+                                <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mt-0.5">Threat Score</span>
+                            </div>
+                        </div>
+
+                        <div id="verdictBadge" class="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            Safe / Benign
+                        </div>
+                        <p id="verdictSummary" class="text-xs text-slate-400 max-w-xs">
+                            No suspicious heuristic indicators or spoofing attempts were flagged.
+                        </p>
+                        
+                        <div class="w-full mt-5 pt-4 border-t border-cyber-border flex justify-between gap-2">
+                            <button id="copyReportBtn" class="flex-1 py-2 rounded-lg bg-cyber-surface hover:bg-cyber-card border border-cyber-border text-xs text-slate-300 font-semibold flex items-center justify-center gap-1.5 transition-all">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                Copy JSON
+                            </button>
+                        </div>
+                        <label class="mt-3 flex items-center gap-2 text-[10px] text-slate-400">
+                            <input id="reportDefangToggle" type="checkbox" checked class="accent-cyan-500">
+                            Defang links in copied and exported reports
+                        </label>
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <button id="exportCaseReportBtn" type="button" class="py-2 rounded-lg bg-cyber-surface hover:bg-cyber-card border border-cyber-border text-[10px] text-slate-300 font-semibold">Download Case Report</button>
+                            <button id="exportIocsBtn" type="button" class="py-2 rounded-lg bg-cyber-surface hover:bg-cyber-card border border-cyber-border text-[10px] text-slate-300 font-semibold">Download IOC JSON</button>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-2 space-y-4">
+                        
+                        <!-- Lexical URL Decomposition -->
+                        <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                            <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-3 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                                Lexical Component Decomposition
+                            </h3>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-mono">
+                                <div class="p-2.5 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                                    <div class="text-[10px] text-slate-500 uppercase">Protocol</div>
+                                    <div id="decompProtocol" class="text-slate-200 font-semibold truncate">-</div>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-cyber-surface border border-cyber-border/70 sm:col-span-2">
+                                    <div class="text-[10px] text-slate-500 uppercase">Resolved Hostname / IP</div>
+                                    <div id="decompHost" class="text-slate-200 font-semibold truncate">-</div>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                                    <div class="text-[10px] text-slate-500 uppercase">Base SLD / Domain</div>
+                                    <div id="decompDomain" class="text-slate-200 font-semibold truncate">-</div>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                                    <div class="text-[10px] text-slate-500 uppercase">Public TLD</div>
+                                    <div id="decompTld" class="text-slate-200 font-semibold truncate">-</div>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                                    <div class="text-[10px] text-slate-500 uppercase">Subdomain Depth</div>
+                                    <div id="decompSubdomains" class="text-slate-200 font-semibold truncate">0</div>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-cyber-surface border border-cyber-border/70 col-span-2 sm:col-span-3">
+                                    <div class="text-[10px] text-slate-500 uppercase">Path & Parameters</div>
+                                    <div id="decompPath" class="text-slate-200 font-semibold truncate">-</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Live DNS-over-HTTPS (DoH) Telemetry -->
+                        <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                                    Local DNS Telemetry (API-Free Mode)
+                                </h3>
+                                <span id="dohStatus" class="text-[11px] font-mono px-2 py-0.5 rounded bg-cyber-surface border border-cyber-border text-slate-400">Idle</span>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs font-mono">
+                                <div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                                    <div class="text-[10px] text-slate-500 uppercase mb-1">A Records (Not Queried)</div>
+                                    <div id="dohIpAnswer" class="text-cyan-300 font-semibold truncate">Disabled in API-free mode</div>
+                                </div>
+                                <div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                                    <div class="text-[10px] text-slate-500 uppercase mb-1">MX Records (Not Queried)</div>
+                                    <div id="dohMxAnswer" class="text-indigo-300 font-semibold truncate">Disabled in API-free mode</div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Shannon Entropy Meter -->
+                    <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400">Shannon Information Entropy</h3>
+                            <span id="entropyValue" class="text-sm font-mono font-bold text-cyan-400">0.00</span>
+                        </div>
+                        <div class="w-full bg-cyber-surface rounded-full h-2.5 overflow-hidden border border-cyber-border mb-2.5">
+                            <div id="entropyBar" class="h-full bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <p id="entropyDesc" class="text-xs text-slate-400">
+                            Measures the randomness of characters. Values &gt; 4.5 indicate algorithmically generated domains (DGAs) or encrypted tokens.
+                        </p>
+                    </div>
+
+                    <!-- Flagged Threat Indicators -->
+                    <div class="lg:col-span-2 p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                Heuristic Threat Indicators Triggered
+                            </h3>
+                            <span id="flagsCountBadge" class="text-xs font-mono px-2 py-0.5 rounded-full bg-cyber-surface border border-cyber-border text-slate-300">0 Flagged</span>
+                        </div>
+                        <div id="flagsContainer" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                            <!-- Injected Dynamically -->
+                        </div>
+                        <div id="noFlagsMessage" class="hidden p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs text-center font-medium">
+                            No suspicious structural or lexical indicators identified for this target.
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="p-6 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                                Local SOC Threat Intelligence & Incident Response Briefing
+                            </h3>
+                            <p class="text-xs text-slate-400">Local SOC analysis mapping scan indicators to severity and containment actions. No API key or external AI service is used.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button id="generateAiBtn" class="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition-all flex items-center gap-1.5 shadow-lg shadow-cyan-600/20">
+                                Generate Local Briefing
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="aiSummaryContainer" class="p-4 rounded-xl bg-cyber-surface border border-cyber-border/70 text-xs font-mono text-slate-300 leading-relaxed space-y-3">
+                        <div class="flex items-center gap-2 text-slate-400 italic">
+                            <span>API-free mode enabled. Click "Generate Local Briefing" to generate an evidence-based local SOC briefing.</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+
+        <!-- ==================== ADVANCED LOCAL INTELLIGENCE ==================== -->
+        <section id="advancedIntelSection" class="hidden space-y-6">
+            <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                            Advanced Local Intelligence
+                        </h3>
+                        <p class="text-xs text-slate-400">Offline-capable forensic analysis. No DNS, WHOIS, ASN, certificate, reputation, or AI API lookup is performed.</p>
+                    </div>
+                    <div id="investigationIdBadge" class="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-cyber-surface border border-cyber-border text-cyan-300">Investigation: —</div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+                    <div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                        <div class="text-[10px] uppercase text-slate-500">Confidence</div>
+                        <div id="advancedConfidence" class="text-lg font-bold font-mono text-cyan-300 mt-1">—</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                        <div class="text-[10px] uppercase text-slate-500">Detected Scripts</div>
+                        <div id="advancedScripts" class="text-lg font-bold font-mono text-slate-200 mt-1 truncate">—</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                        <div class="text-[10px] uppercase text-slate-500">Encoded / Redirect Hints</div>
+                        <div id="advancedObfuscation" class="text-lg font-bold font-mono text-amber-300 mt-1">0</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                        <div class="text-[10px] uppercase text-slate-500">IOC Count</div>
+                        <div id="advancedIocCount" class="text-lg font-bold font-mono text-rose-300 mt-1">0</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="p-4 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-xs uppercase tracking-wider font-semibold text-slate-400">Why This URL Was Flagged</h4>
+                            <span id="riskSeverityLabel" class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyber-dark border border-cyber-border">—</span>
+                        </div>
+                        <div id="explanationContainer" class="space-y-2 text-[11px] text-slate-300">—</div>
+                    </div>
+                    <div class="p-4 rounded-xl bg-cyber-surface border border-cyber-border/70">
+                        <h4 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-3">Risk Drivers</h4>
+                        <div id="riskDriversContainer" class="space-y-2">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400">URL Normalization & Obfuscation</h3>
+                        <span id="normalizationBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyber-surface border border-cyber-border text-slate-400">Local</span>
+                    </div>
+                    <div class="space-y-3 font-mono text-[11px]">
+                        <div><div class="text-[10px] uppercase text-slate-500">Input</div><div id="rawUrlAdvanced" class="mt-1 p-2 rounded-lg bg-cyber-surface border border-cyber-border break-all">—</div></div>
+                        <div><div class="text-[10px] uppercase text-slate-500">Browser-normalized URL</div><div id="normalizedUrlAdvanced" class="mt-1 p-2 rounded-lg bg-cyber-surface border border-cyber-border break-all">—</div></div>
+                        <div id="obfuscatedIpBox" class="hidden p-3 rounded-lg bg-rose-500/5 border border-rose-500/20">
+                            <div class="text-rose-300 font-semibold">Obfuscated IP representation detected</div>
+                            <div id="obfuscatedIpDetails" class="mt-1 text-slate-400 break-all">—</div>
+                        </div>
+                        <div id="encodedPayloadBox" class="hidden p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                            <div class="text-amber-300 font-semibold">Encoded payload hints</div>
+                            <div id="encodedPayloadDetails" class="mt-1 text-slate-400 break-all">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                    <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-3">Domain Structure Visualization</h3>
+                    <div id="domainStructureVisual" class="font-mono text-[11px] space-y-2">—</div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+                        <div class="p-2.5 rounded-lg bg-cyber-surface border border-cyber-border"><div class="text-[10px] text-slate-500">Labels</div><div id="structureLabels" class="font-bold mt-1">0</div></div>
+                        <div class="p-2.5 rounded-lg bg-cyber-surface border border-cyber-border"><div class="text-[10px] text-slate-500">Digits</div><div id="structureDigits" class="font-bold mt-1">0</div></div>
+                        <div class="p-2.5 rounded-lg bg-cyber-surface border border-cyber-border"><div class="text-[10px] text-slate-500">Hyphens</div><div id="structureHyphens" class="font-bold mt-1">0</div></div>
+                        <div class="p-2.5 rounded-lg bg-cyber-surface border border-cyber-border"><div class="text-[10px] text-slate-500">Depth</div><div id="structureDepth" class="font-bold mt-1">0</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                    <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-3">Unicode & Character Forensics</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border">
+                            <div class="text-[10px] uppercase text-slate-500">Scripts</div>
+                            <div id="unicodeScriptsList" class="mt-1 text-xs text-slate-200 break-words">—</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border">
+                            <div class="text-[10px] uppercase text-slate-500">Composition</div>
+                            <div id="compositionStats" class="mt-1 text-xs text-slate-200 space-y-1">—</div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="text-[10px] uppercase text-slate-500 mb-1">Suspicious character map</div>
+                        <div id="characterInspector" class="max-h-48 overflow-y-auto p-3 rounded-xl bg-cyber-surface border border-cyber-border font-mono text-[10px] space-y-1">—</div>
+                    </div>
+                </div>
+
+                <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                    <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-3">Path, Parameter & Token Analysis</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                        <div class="p-2.5 rounded-lg bg-cyber-surface border border-cyber-border"><div class="text-[10px] text-slate-500">Path depth</div><div id="pathDepthValue" class="font-bold mt-1">0</div></div>
+                        <div class="p-2.5 rounded-lg bg-cyber-surface border border-cyber-border"><div class="text-[10px] text-slate-500">Parameters</div><div id="paramCountValue" class="font-bold mt-1">0</div></div>
+                        <div class="p-2.5 rounded-lg bg-cyber-surface border border-cyber-border"><div class="text-[10px] text-slate-500">Random tokens</div><div id="randomTokenValue" class="font-bold mt-1">0</div></div>
+                        <div class="p-2.5 rounded-lg bg-cyber-surface border border-cyber-border"><div class="text-[10px] text-slate-500">Port</div><div id="portValue" class="font-bold mt-1">Default</div></div>
+                    </div>
+                    <div id="parameterAnalysis" class="space-y-2 max-h-52 overflow-y-auto text-[10px] font-mono">—</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400">IOC Extraction</h3>
+                        <button id="copyIocBtn" type="button" class="px-3 py-1.5 rounded-lg bg-cyber-surface border border-cyber-border text-[10px] font-semibold text-cyan-300">Copy IOCs</button>
+                    </div>
+                    <div id="iocContainer" class="space-y-3 text-[10px] font-mono">—</div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <button id="exportStixBtn" type="button" class="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-semibold">Export STIX 2.1</button>
+                        <button id="copyNormalizedBtn" type="button" class="px-3 py-1.5 rounded-lg bg-cyber-surface border border-cyber-border text-[10px] font-semibold text-slate-300">Copy Normalized URL</button>
+                    </div>
+                </div>
+
+                <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                    <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-3">MITRE ATT&CK & Investigation Timeline</h3>
+                    <div id="mitreContainer" class="space-y-2 mb-4">—</div>
+                    <div id="timelineContainer" class="space-y-2 max-h-48 overflow-y-auto text-[10px] font-mono">—</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                    <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-3">Local Dashboard Trends</h3>
+                    <div class="grid grid-cols-3 gap-2 mb-4">
+                        <div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border"><div class="text-[10px] text-slate-500">Total</div><div id="trendTotal" class="text-lg font-bold mt-1">0</div></div>
+                        <div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border"><div class="text-[10px] text-slate-500">Phishing</div><div id="trendPhishing" class="text-lg font-bold text-rose-300 mt-1">0</div></div>
+                        <div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border"><div class="text-[10px] text-slate-500">Suspicious</div><div id="trendSuspicious" class="text-lg font-bold text-amber-300 mt-1">0</div></div>
+                    </div>
+                    <div id="riskDistributionBars" class="space-y-2 text-[10px] font-mono">—</div>
+                    <div class="mt-4">
+                        <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Top detection reasons</div>
+                        <div id="topReasonBars" class="space-y-2 text-[10px] font-mono">—</div>
+                    </div>
+                </div>
+
+                <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                    <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-3">Analyst Verdict & Notes</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button data-analyst-value="true_positive" class="analyst-btn px-3 py-2 rounded-lg bg-cyber-surface border border-cyber-border text-xs font-semibold">True Positive</button>
+                        <button data-analyst-value="false_positive" class="analyst-btn px-3 py-2 rounded-lg bg-cyber-surface border border-cyber-border text-xs font-semibold">False Positive</button>
+                        <button data-analyst-value="benign" class="analyst-btn px-3 py-2 rounded-lg bg-cyber-surface border border-cyber-border text-xs font-semibold">Benign</button>
+                        <button data-analyst-value="needs_review" class="analyst-btn px-3 py-2 rounded-lg bg-cyber-surface border border-cyber-border text-xs font-semibold">Needs Review</button>
+                    </div>
+                    <textarea id="analystNotes" rows="5" class="w-full mt-3 p-3 rounded-xl bg-cyber-surface border border-cyber-border text-xs text-slate-200 placeholder-slate-500 font-mono" placeholder="Add local analyst notes..."></textarea>
+                    <button id="saveAnalystBtn" type="button" class="mt-3 w-full py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-xs font-semibold">Save Analyst Assessment</button>
+                    <div id="networkVisibilityNote" class="mt-4 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-[10px] text-slate-400 leading-relaxed">
+                        Network/registration visibility: API-free browser mode intentionally does not perform WHOIS/RDAP, ASN, TLS-certificate, domain-age, reputation, reverse-DNS, or webpage-fetch operations. Those require external network access or a backend. PhishGuard will not fabricate those values.
+                    </div>
+                </div>
+
+            <div class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <div>
+                        <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400">Local URL Comparison</h3>
+                        <p class="text-[10px] text-slate-500">Compare the current target with another URL without contacting either destination.</p>
+                    </div>
+                    <button id="compareCurrentBtn" type="button" class="px-3 py-1.5 rounded-lg bg-cyber-surface border border-cyber-border text-[10px] font-semibold text-cyan-300">Compare</button>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[10px] uppercase text-slate-500">Current URL</label>
+                        <div id="compareCurrentUrl" class="mt-1 p-2 rounded-lg bg-cyber-surface border border-cyber-border break-all font-mono text-[10px] text-slate-300">—</div>
+                    </div>
+                    <div>
+                        <label for="compareOtherUrl" class="text-[10px] uppercase text-slate-500">Other URL</label>
+                        <input id="compareOtherUrl" type="text" class="mt-1 w-full p-2 rounded-lg bg-cyber-surface border border-cyber-border text-[10px] font-mono text-slate-200" placeholder="https://example.com/login">
+                    </div>
+                </div>
+                <div id="comparisonResult" class="hidden mt-4">—</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 2: QUISHING (QR CODE) SCANNER ==================== -->
+        <div id="qrView" class="hidden space-y-6">
+            <section class="p-6 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl">
+                <div class="max-w-2xl mx-auto text-center space-y-2 mb-6">
+                    <h2 class="text-lg font-bold text-white flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                        Quishing (QR Code Phishing) Analyzer
+                    </h2>
+                    <p class="text-xs text-slate-400">
+                        Scan physical or digital QR codes used by attackers to bypass email filters and deceive mobile users.
+                    </p>
+                </div>
+
+                <div class="max-w-xl mx-auto space-y-4">
+                    
+                    <!-- File Upload Box -->
+                    <label class="border-2 border-dashed border-cyber-border hover:border-cyan-500/50 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer bg-cyber-surface/40 hover:bg-cyber-surface/80 transition-all">
+                        <svg class="w-10 h-10 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <span class="text-sm font-semibold text-slate-200">Upload QR Image File</span>
+                        <span class="text-xs text-slate-500 mt-1">PNG, JPG, WEBP formats supported</span>
+                        <input type="file" id="qrFileInput" accept="image/*" class="hidden">
+                    </label>
+
+                    <div class="relative flex items-center justify-center">
+                        <div class="border-t border-cyber-border w-full"></div>
+                        <span class="bg-cyber-dark px-3 text-xs text-slate-500 uppercase">Or</span>
+                    </div>
+
+                    <!-- Webcam Controls -->
+                    <div class="text-center">
+                        <button id="qrCameraToggle" class="px-5 py-2.5 rounded-xl bg-cyber-surface hover:bg-cyber-card border border-cyber-border text-sm font-semibold text-slate-200 transition-all flex items-center justify-center gap-2 mx-auto">
+                            <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <span id="cameraBtnText">Start Webcam Scanner</span>
+                        </button>
+                    </div>
+
+                    <!-- Live Video Viewport -->
+                    <div id="qrVideoContainer" class="hidden relative rounded-xl overflow-hidden border border-cyan-500/30 max-w-sm mx-auto aspect-square bg-black">
+                        <video id="qrVideo" class="w-full h-full object-cover"></video>
+                        <canvas id="qrCanvas" class="hidden"></canvas>
+                        <div class="absolute inset-0 border-2 border-cyan-400/50 pointer-events-none m-8 rounded-lg flex items-center justify-center">
+                            <div class="w-full h-0.5 bg-cyan-400 animate-pulse"></div>
+                        </div>
+                    </div>
+
+                    <!-- Decoded Result Box -->
+                    <div id="qrResultBox" class="hidden p-4 rounded-xl bg-cyber-surface border border-cyan-500/30 space-y-3">
+                        <div class="text-xs uppercase tracking-wider font-semibold text-cyan-400">Decoded QR Code Payload:</div>
+                        <div id="qrDecodedText" class="p-3 rounded-lg bg-cyber-dark font-mono text-xs text-slate-200 break-all select-all border border-cyber-border"></div>
+                        <button id="qrScanExtractedBtn" class="w-full py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-semibold shadow transition-all">
+                            Inspect Extracted URL in Classifier &rarr;
+                        </button>
+                    </div>
+
+                </div>
+            </section>
+        </div>
+
+        <!-- ==================== TAB 3: BATCH AUDIT VIEW ==================== -->
+        <div id="batchView" class="hidden space-y-6">
+            <section class="p-6 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl space-y-4">
+                <div>
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                        Bulk URL Classifier & CSV Exporter
+                    </h2>
+                    <p class="text-xs text-slate-400">Paste multiple URLs (one per line) to evaluate threat scores and export compliance reports.</p>
+                </div>
+
+                <textarea id="batchUrlsInput" rows="6" placeholder="https://legit-site.com&#10;http://paypa1.com/verify-account&#10;http://192.168.1.55/login.php&#10;https://pаypal.com/auth" 
+                    class="w-full p-3.5 rounded-xl bg-cyber-surface border border-cyber-border text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono text-xs leading-relaxed"></textarea>
+
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <button id="runBatchBtn" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold text-xs shadow-lg transition-all flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
+                            Execute Batch Audit
+                        </button>
+                        <button id="exportCsvBtn" class="px-4 py-2.5 rounded-xl bg-cyber-surface hover:bg-cyber-card border border-cyber-border text-xs text-slate-300 font-semibold transition-all flex items-center gap-2">
+                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            Export Audit CSV
+                        </button>
+                    </div>
+                    <div id="batchProgress" class="hidden text-xs font-mono text-slate-400">Processing: <span id="batchProgressCount">0/0</span></div>
+                </div>
+
+                <!-- Batch Results Table -->
+                <div class="overflow-x-auto rounded-xl border border-cyber-border">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-cyber-surface text-slate-400 border-b border-cyber-border uppercase text-[10px]">
+                            <tr>
+                                <th class="p-3">Target Domain / Host</th>
+                                <th class="p-3">Risk Score</th>
+                                <th class="p-3">Verdict</th>
+                                <th class="p-3">Entropy</th>
+                                <th class="p-3">Flags Triggered</th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchResultsTableBody" class="divide-y divide-cyber-border bg-cyber-dark/40 text-slate-300">
+                            <tr>
+                                <td colspan="5" class="p-4 text-center text-slate-500">No batch analysis executed yet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- ==================== LOCAL EMAIL ANALYZER ==================== -->
+        <div id="emailView" class="hidden space-y-6">
+            <section class="p-6 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl space-y-4">
+                <div>
+                    <h2 class="text-base font-bold text-white">Email Phishing Triage</h2>
+                    <p class="text-xs text-slate-400 mt-1">Paste plain-text email headers and body to compare sender fields and inspect embedded links locally.</p>
+                </div>
+                <textarea id="emailInput" rows="12" maxlength="100000" class="w-full p-3.5 rounded-xl bg-cyber-surface border border-cyber-border text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono text-xs leading-relaxed" placeholder="From: Billing Team &lt;notice@example.com&gt;&#10;Reply-To: support@another-domain.example&#10;Subject: Verify your account&#10;Authentication-Results: mx.example; spf=fail; dkim=none; dmarc=fail&#10;&#10;Please review your account at https://example.com/login"></textarea>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-[10px] text-slate-500">Authentication-Results is read from the pasted text only; this tool cannot verify the headers or perform SPF/DKIM/DMARC checks.</p>
+                    <button id="analyzeEmailBtn" type="button" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold text-xs">Analyze Email Locally</button>
+                </div>
+                <div id="emailResult" class="hidden space-y-4">
+                    <div id="emailSummary" class="p-4 rounded-xl border border-cyber-border bg-cyber-surface text-sm"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="p-4 rounded-xl border border-cyber-border bg-cyber-surface">
+                            <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-2">Sender and Authentication</h3>
+                            <div id="emailHeaderFindings" class="space-y-2 text-xs text-slate-300"></div>
+                        </div>
+                        <div class="p-4 rounded-xl border border-cyber-border bg-cyber-surface">
+                            <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-2">Extracted Links</h3>
+                            <div id="emailLinksSummary" class="text-xs text-slate-400"></div>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto rounded-xl border border-cyber-border">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-cyber-surface text-slate-400 border-b border-cyber-border uppercase text-[10px]">
+                                <tr><th class="p-3">URL</th><th class="p-3">Score</th><th class="p-3">Verdict</th><th class="p-3 text-right">Action</th></tr>
+                            </thead>
+                            <tbody id="emailLinksBody" class="divide-y divide-cyber-border bg-cyber-dark/40 text-slate-300">
+                                <tr><td colspan="4" class="p-4 text-center text-slate-500">No links analyzed.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- ==================== DETECTION QUALITY TEST LAB ==================== -->
+        <div id="testsView" class="hidden space-y-6">
+            <section class="p-6 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl space-y-4">
+                <div>
+                    <h2 class="text-base font-bold text-white">Heuristic Detection Test Lab</h2>
+                    <p class="text-xs text-slate-400 mt-1">Run a small, labeled demo set against the current local rules. Metrics describe this sample only and do not establish real-world detection quality.</p>
+                </div>
+                <div class="flex flex-wrap items-end gap-3">
+                    <label class="text-xs text-slate-400">Flagged score threshold
+                        <input id="testThreshold" type="number" min="0" max="100" value="25" class="ml-2 w-20 p-2 rounded-lg bg-cyber-surface border border-cyber-border text-white font-mono">
+                    </label>
+                    <button id="runDetectionTestsBtn" type="button" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold text-xs">Run Labeled Tests</button>
+                </div>
+                <div id="testMetrics" class="hidden"></div>
+                <div class="overflow-x-auto rounded-xl border border-cyber-border">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-cyber-surface text-slate-400 border-b border-cyber-border uppercase text-[10px]">
+                            <tr><th class="p-3">Labeled URL</th><th class="p-3">Expected</th><th class="p-3">Score</th><th class="p-3">Prediction</th><th class="p-3">Result</th></tr>
+                        </thead>
+                        <tbody id="testResultsBody" class="divide-y divide-cyber-border bg-cyber-dark/40 text-slate-300">
+                            <tr><td colspan="5" class="p-4 text-center text-slate-500">Run the labeled test set to see metrics.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- ==================== INVESTIGATION AUDIT TRAIL ==================== -->
+        <section class="p-5 rounded-2xl bg-cyber-dark border border-cyber-border shadow-xl space-y-3">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400">Recent Investigation Audit Trail</h3>
+                </div>
+                <button id="clearHistoryBtn" class="text-xs text-rose-400 hover:text-rose-300 transition-all font-mono">Clear History</button>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-cyber-border">
+                <table class="w-full text-left text-xs font-mono">
+                    <thead class="bg-cyber-surface text-slate-400 border-b border-cyber-border uppercase text-[10px]">
+                        <tr>
+                            <th class="p-3">Timestamp</th>
+                            <th class="p-3">Scanned Domain / URL</th>
+                            <th class="p-3">Risk Score</th>
+                            <th class="p-3">Verdict</th>
+                            <th class="p-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody" class="divide-y divide-cyber-border bg-cyber-dark/40 text-slate-300">
+                        <tr>
+                            <td colspan="5" class="p-4 text-center text-slate-500">History is currently empty.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Custom In-App Notification Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 px-4 py-2.5 rounded-xl bg-cyber-surface border border-cyan-500/40 text-white text-xs font-mono shadow-2xl transition-all transform translate-y-20 opacity-0 z-50 flex items-center gap-2">
+        <span id="toastIcon" class="text-cyan-400">&bull;</span>
+        <span id="toastMessage">Notification message</span>
+    </div>
+
+    <!-- ==================== SCRIPTS & ENGINE LOGIC ==================== -->
+    <script>
+        'use strict';
+
+        // ==================== API-FREE LOCAL SECURITY ENGINE ====================
+        const TARGET_BRANDS = [
+            'paypal', 'google', 'netflix', 'microsoft', 'apple', 'amazon',
+            'facebook', 'instagram', 'whatsapp', 'chase', 'wellsfargo',
+            'bankofamerica', 'binance', 'coinbase', 'roblox', 'steam', 'dhl'
+        ];
+        const SUSPICIOUS_TLDS = [
+            '.xyz', '.top', '.zip', '.mov', '.tk', '.ml', '.ga', '.cf', '.gq',
+            '.buzz', '.work', '.click', '.surf', '.monster', '.rest', '.bar', '.country'
+        ];
+        const PHISHING_KEYWORDS = [
+            'login', 'signin', 'verify', 'verification', 'update', 'account',
+            'banking', 'secure', 'security', 'wallet', 'confirm', 'billing',
+            'password', 'credential', 'recover', 'token', 'auth', 'suspended',
+            'payment', 'invoice', 'unlock', 'activate', 'validate'
+        ];
+        const HOMOGLYPH_MAP = {
+            'а': 'a', 'с': 'c', 'е': 'e', 'о': 'o', 'р': 'p', 'ѕ': 's',
+            'х': 'x', 'у': 'y', 'і': 'i', 'ј': 'j', 'ӏ': 'l', 'ո': 'n',
+            'ԛ': 'q', 'ԁ': 'd', 'ԍ': 'g', 'һ': 'h', 'ԕ': 'u', 'ν': 'v',
+            'Α': 'a', 'Β': 'b', 'Ε': 'e', 'Ζ': 'z', 'Η': 'h', 'Ι': 'i',
+            'Κ': 'k', 'Μ': 'm', 'Ν': 'n', 'Ο': 'o', 'Ρ': 'p', 'Τ': 't',
+            'Χ': 'x', 'Υ': 'y', 'α': 'a', 'ο': 'o', 'ρ': 'p'
+        };
+        const MULTI_LABEL_SUFFIXES = new Set([
+            'co.uk', 'org.uk', 'me.uk', 'ac.uk', 'gov.uk',
+            'com.au', 'net.au', 'org.au', 'edu.au', 'gov.au',
+            'co.in', 'firm.in', 'net.in', 'org.in', 'gen.in', 'ind.in',
+            'co.jp', 'ne.jp', 'or.jp', 'com.br', 'com.cn', 'com.sg', 'com.my'
+        ]);
+        const SHORTENER_DOMAINS = new Set([
+            'bit.ly', 'tinyurl.com', 't.co', 'ow.ly', 'is.gd', 'buff.ly',
+            'cutt.ly', 'rb.gy', 'shorturl.at', 'rebrand.ly', 's.id', 'lnkd.in'
+        ]);
+        const REDIRECT_PARAM_NAMES = new Set([
+            'url', 'uri', 'u', 'redirect', 'redirect_url', 'redirecturl', 'next',
+            'continue', 'return', 'returnurl', 'return_url', 'dest', 'destination',
+            'target', 'to', 'link', 'out', 'goto', 'r', 'redir'
+        ]);
+        const MITRE_RULES = [
+            { id: 'T1566.002', name: 'Phishing: Spearphishing Link', test: r => r.flags.some(f => /credential|brand|redirect|shortener/i.test(f.title)) },
+            { id: 'T1204.001', name: 'User Execution: Malicious Link', test: r => /^http:/i.test(r.decomposition.protocol) || r.flags.some(f => /credential|suspicious|typosquat/i.test(f.title)) },
+            { id: 'T1189', name: 'Drive-by Compromise', test: r => r.flags.some(f => /encoded|redirect|subdomain/i.test(f.title)) },
+            { id: 'T1583.001', name: 'Acquire Infrastructure: Domains', test: r => r.flags.some(f => /suspicious TLD|typosquat|internationalized/i.test(f.title)) },
+            { id: 'T1584.004', name: 'Compromise Infrastructure: Server', test: r => r.isIpHost }
+        ];
+        const HISTORY_KEY = 'phishguard_history_v4';
+        const ASSESSMENT_KEY = 'phishguard_assessments_v4';
+        let lastAnalysisReport = null;
+        let batchResults = [];
+        let videoStream = null;
+        let qrScanningActive = false;
+        let qrAnimFrameId = null;
+        let toastTimer = null;
+        let selectedAnalystVerdict = '';
+
+        const $ = id => document.getElementById(id);
+        const safeText = value => value == null ? '' : String(value);
+        function escapeHtml(text) {
+            return safeText(text).replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[m]));
+        }
+        function showToast(message, type = 'info') {
+            const toast = $('toast'), icon = $('toastIcon'), msg = $('toastMessage');
+            if (!toast || !icon || !msg) return;
+            msg.textContent = message;
+            icon.textContent = type === 'error' ? '!' : type === 'success' ? '✓' : '•';
+            icon.className = type === 'error' ? 'text-rose-400' : type === 'success' ? 'text-emerald-400' : 'text-cyan-400';
+            toast.classList.remove('translate-y-20','opacity-0');
+            toast.classList.add('translate-y-0','opacity-100');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.add('translate-y-20','opacity-0');
+                toast.classList.remove('translate-y-0','opacity-100');
+            }, 2600);
+        }
+        function downloadText(filename, text, type='text/plain;charset=utf-8') {
+            const blob = new Blob([text], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 0);
+        }
+        async function copyText(text) {
+            try { await navigator.clipboard.writeText(text); return true; }
+            catch {
+                const ta = document.createElement('textarea');
+                ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.select();
+                let ok = false; try { ok = document.execCommand('copy'); } catch {}
+                ta.remove(); return ok;
+            }
+        }
+
+        // ---------- Core URL helpers ----------
+        function normalizeHostnameForAnalysis(hostname) { return safeText(hostname).toLowerCase().replace(/^\.+|\.+$/g, ''); }
+        function isValidIPv4(host) {
+            if (!/^\d+(?:\.\d+){3}$/.test(host)) return false;
+            return host.split('.').every(p => /^\d{1,3}$/.test(p) && Number(p) <= 255);
+        }
+        function isIPAddress(hostname) {
+            const host = normalizeHostnameForAnalysis(hostname).replace(/^\[|\]$/g, '');
+            if (isValidIPv4(host)) return true;
+            return host.includes(':') && /^[0-9a-f:]+$/i.test(host);
+        }
+        function parseIPv4Integer(value) {
+            const s = safeText(value).trim().toLowerCase();
+            if (/^0x[0-9a-f]+$/.test(s)) {
+                const n = Number.parseInt(s.slice(2), 16); return Number.isSafeInteger(n) && n >= 0 && n <= 0xffffffff ? n : null;
+            }
+            if (/^\d+$/.test(s)) {
+                const n = Number(s); return Number.isSafeInteger(n) && n >= 0 && n <= 0xffffffff ? n : null;
+            }
+            const parts = s.split('.');
+            if (parts.length === 4 && parts.every(p => /^(?:0[0-7]+|[0-9]{1,3})$/.test(p))) {
+                const nums = parts.map(p => /^0[0-7]+$/.test(p) && p.length > 1 ? parseInt(p, 8) : Number(p));
+                if (nums.every(n => Number.isInteger(n) && n >= 0 && n <= 255)) return nums.reduce((acc, n) => acc * 256 + n, 0);
+            }
+            return null;
+        }
+        function integerToIPv4(n) { return [24,16,8,0].map(s => (n >>> s) & 255).join('.'); }
+        function detectObfuscatedIp(rawHost) {
+            let host = safeText(rawHost).trim().toLowerCase();
+            host = host.replace(/^\[/, '').replace(/\]$/, '');
+            if (host.includes(':')) return null;
+            const numeric = parseIPv4Integer(host);
+            if (numeric == null) return null;
+            const canonical = integerToIPv4(numeric);
+            const ordinary = isValidIPv4(host);
+            if (ordinary) return null;
+            return { original: host, canonical, reason: /^0x/.test(host) ? 'hexadecimal IPv4 representation' : /^\d+$/.test(host) ? '32-bit decimal IPv4 representation' : 'octal/mixed numeric IPv4 representation' };
+        }
+        function extractRawHost(rawInput) {
+            const candidate = safeText(rawInput).trim();
+            if (!candidate) return '';
+            try {
+                const withScheme = /^[a-z][a-z\d+.-]*:\/\//i.test(candidate) ? candidate : `http://${candidate}`;
+                const match = withScheme.match(/^[a-z][a-z\d+.-]*:\/\/([^\/?#]*)/i);
+                if (!match) return '';
+                let authority = match[1];
+                const at = authority.lastIndexOf('@'); if (at >= 0) authority = authority.slice(at + 1);
+                if (authority.startsWith('[')) return authority.slice(0, authority.indexOf(']') + 1);
+                return authority.replace(/:\d+$/, '');
+            } catch { return ''; }
+        }
+        function getRegistrableDomain(hostname) {
+            const labels = normalizeHostnameForAnalysis(hostname).split('.').filter(Boolean);
+            if (labels.length <= 1) return labels[0] || '';
+            const lastTwo = labels.slice(-2).join('.');
+            if (MULTI_LABEL_SUFFIXES.has(lastTwo) && labels.length >= 3) return labels.slice(-3).join('.');
+            return lastTwo;
+        }
+        function getBaseDomainLabel(hostname) {
+            const rd = getRegistrableDomain(hostname); return rd.split('.')[0] || rd;
+        }
+        function normalizeSpoofText(text) {
+            let out = '';
+            for (const ch of safeText(text).normalize('NFKC')) out += HOMOGLYPH_MAP[ch] || ch;
+            return out.toLowerCase();
+        }
+        function decodePunycodePart(input) {
+            const base=36,tmin=1,tmax=26,skew=38,damp=700,initialBias=72,initialN=128;
+            let n=initialN,i=0,bias=initialBias,out=[];
+            const delim=input.lastIndexOf('-'); const basic=delim>0?input.slice(0,delim):'';
+            for(const ch of basic) out.push(ch); let pos=delim>0?delim+1:0;
+            while(pos<input.length){
+                const oldI=i; let w=1; let k=base;
+                for(;;k+=base){ if(pos>=input.length) throw new Error('Invalid Punycode'); const c=input.charCodeAt(pos++);
+                    const d=c-48<10?c-22:c-65<26?c-65:c-97<26?c-97:base; if(d<0||d>=base) throw new Error('Invalid digit');
+                    i+=d*w; const t=k<=bias?tmin:k>=bias+tmax?tmax:k-bias; if(d<t) break; w*=base-t; if(!Number.isSafeInteger(w)||!Number.isSafeInteger(i)) throw new Error('Overflow'); }
+                let delta=(oldI===0?Math.floor(i/damp):Math.floor((i-oldI)/2))+Math.floor((i-oldI)/(out.length+1)); let kk=0;
+                while(delta>Math.floor(((base-tmin)*tmax)/2)){delta=Math.floor(delta/(base-tmin));kk+=base;}
+                bias=Math.floor(kk+((base-tmin+1)*delta)/(delta+skew)); n+=Math.floor(i/(out.length+1)); i%=out.length+1;
+                if(n>0x10ffff) throw new Error('Invalid code point'); out.splice(i,0,String.fromCodePoint(n)); i++;
+            } return out.join('');
+        }
+        function decodeFullPunycodeHost(host) {
+            if (!/xn--/i.test(host)) return host;
+            return host.split('.').map(label => /^xn--/i.test(label) ? (()=>{ try{return decodePunycodePart(label.slice(4).toLowerCase());}catch{return label;} })() : label).join('.');
+        }
+        function detectHomoglyphsAndPunycode(rawCandidate, parsedHostname) {
+            const raw=safeText(rawCandidate).toLowerCase(); const decoded=decodeFullPunycodeHost(parsedHostname);
+            const rawNonAscii=/[^\x00-\x7F]/.test(raw); const decodedNonAscii=/[^\x00-\x7F]/.test(decoded); const puny=/(^|\.)xn--/i.test(parsedHostname);
+            const target=rawNonAscii?raw:decoded; const normalized=normalizeSpoofText(target); const searchSpace=`${normalized}.${normalizeSpoofText(decoded)}`;
+            let spoofedBrand=null; if(rawNonAscii||decodedNonAscii||puny){ for(const brand of TARGET_BRANDS){ if(searchSpace.includes(brand)){spoofedBrand=brand.toUpperCase();break;} } }
+            return { isPunycode:puny, hasHomoglyphs:rawNonAscii, decodedUnicode:decoded, normalized, spoofedBrand };
+        }
+        function calculateLevenshtein(a,b){ a=safeText(a);b=safeText(b);if(a===b)return 0;if(!a.length)return b.length;if(!b.length)return a.length;if(a.length>b.length)[a,b]=[b,a];let prev=Array.from({length:a.length+1},(_,i)=>i);for(let j=1;j<=b.length;j++){const cur=[j];for(let i=1;i<=a.length;i++){const c=a[i-1]===b[j-1]?0:1;cur[i]=Math.min(cur[i-1]+1,prev[i]+1,prev[i-1]+c);}prev=cur;}return prev[a.length]; }
+        function computeShannonEntropy(str){ str=safeText(str);if(!str)return 0;const freq=Object.create(null);for(const c of str)freq[c]=(freq[c]||0)+1;let h=0;for(const c in freq){const p=freq[c]/str.length;h-=p*Math.log2(p);}return Number(h.toFixed(3)); }
+        function addFlag(flags,title,desc,points,type='warning'){ if(!flags.some(f=>f.title===title)) flags.push({title,desc,points:`+${points}`,type}); }
+
+        function detectScripts(text){
+            const scripts=new Set();
+            for(const ch of safeText(text)){
+                const cp=ch.codePointAt(0);
+                if(cp>=0x0041&&cp<=0x024f) scripts.add('Latin');
+                else if(cp>=0x0370&&cp<=0x03ff) scripts.add('Greek');
+                else if(cp>=0x0400&&cp<=0x052f) scripts.add('Cyrillic');
+                else if(cp>=0x0590&&cp<=0x05ff) scripts.add('Hebrew');
+                else if(cp>=0x0600&&cp<=0x06ff) scripts.add('Arabic');
+                else if(cp>=0x0900&&cp<=0x097f) scripts.add('Devanagari');
+                else if(cp>=0x4e00&&cp<=0x9fff) scripts.add('Han');
+                else if(/\d|[\-._~:/?#\[\]@!$&'()*+,;=%]/.test(ch)) continue;
+                else if(cp>0x7f) scripts.add('Other Unicode');
+            }
+            return [...scripts];
+        }
+        function safeDecodeURIComponent(value){ try{return decodeURIComponent(value);}catch{return value;} }
+        function isProbablyBase64(value){ const s=safeText(value).trim(); return s.length>=12&&s.length<=512&&s.length%4===0&&/^[A-Za-z0-9+/]+={0,2}$/.test(s); }
+        function decodeBase64Utf8(value){
+            try{ const binary=atob(value); const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0)); return new TextDecoder().decode(bytes); }
+            catch{ return null; }
+        }
+        function analyzeParameters(parsed){
+            const params=[]; const redirect=[]; const encoded=[]; const keys=[];
+            for(const [key,value] of parsed.searchParams.entries()){
+                keys.push(key); const decoded=safeDecodeURIComponent(value); const lowerKey=key.toLowerCase();
+                const candidateUrl=safeDecodeURIComponent(value.replace(/\+/g,'%20'));
+                const redirectLike=REDIRECT_PARAM_NAMES.has(lowerKey) || /^https?:\/\//i.test(candidateUrl);
+                if(redirectLike) redirect.push({key,value:decoded,decodedUrl:/^https?:\/\//i.test(decoded)?decoded:candidateUrl});
+                const b64=isProbablyBase64(value)&&decodeBase64Utf8(value);
+                if(b64) encoded.push({key,value,decoded:b64});
+                params.push({key,value:decoded,redirectLike,base64:!!b64});
+            }
+            return {params,redirect,encoded,keys};
+        }
+        function detectRandomTokens(text){
+            const tokens=[]; const re=/[A-Za-z0-9_-]{12,}/g; let m;
+            while((m=re.exec(safeText(text))) && tokens.length<12){ const t=m[0]; const hasLetter=/[A-Za-z]/.test(t), hasDigit=/\d/.test(t); const unique=new Set(t).size;
+                if(hasLetter&&hasDigit&&unique/t.length>0.55) tokens.push(t); }
+            return tokens;
+        }
+        function analyzeComposition(text){
+            const s=safeText(text); const n=s.length||1; const letters=(s.match(/[A-Za-z]/g)||[]).length; const digits=(s.match(/\d/g)||[]).length; const symbols=(s.match(/[^A-Za-z0-9]/g)||[]).length;
+            return {length:s.length,letters,digits,symbols,letterPct:Math.round(letters/n*100),digitPct:Math.round(digits/n*100),symbolPct:Math.round(symbols/n*100)};
+        }
+        function analyzeCharacterMap(host){
+            const rows=[];
+            for(const ch of safeText(host)){
+                const cp=ch.codePointAt(0); if(cp>127 || HOMOGLYPH_MAP[ch]) rows.push({char:ch,code:`U+${cp.toString(16).toUpperCase().padStart(4,'0')}`,mapped:HOMOGLYPH_MAP[ch]||'—',scripts:detectScripts(ch).join(', ')||'ASCII'});
+            }
+            return rows.slice(0,100);
+        }
+        function getPathStats(parsed){
+            const path=parsed.pathname||'/'; const segments=path.split('/').filter(Boolean); return {depth:segments.length,extension:(segments.at(-1)?.includes('.')?segments.at(-1).split('.').pop():'').toLowerCase()||'none',length:path.length,segments};
+        }
+        function extractIocs(report){
+            const text=`${report.rawUrl}\n${report.cleanUrl}\n${report.decomposition.pathAndQuery}`; const urls=[]; const ips=[]; const emails=[]; const domains=[];
+            const urlRe=/https?:\/\/[^\s<>'"`]+/gi; let m; while((m=urlRe.exec(text))) urls.push(m[0].replace(/[),.;]+$/,''));
+            const ipRe=/(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])/g; while((m=ipRe.exec(text))) if(isValidIPv4(m[0])) ips.push(m[0]);
+            const emailRe=/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi; while((m=emailRe.exec(text))) emails.push(m[0]);
+            for(const d of [report.decomposition.hostname, report.decomposition.domain]) if(d&&!isIPAddress(d)) domains.push(d);
+            const uniq=a=>[...new Set(a)]; return {urls:uniq(urls),ips:uniq(ips),emails:uniq(emails),domains:uniq(domains)};
+        }
+        function mapMitre(report){ return MITRE_RULES.filter(r=>r.test(report)).map(r=>({id:r.id,name:r.name})); }
+        function calculateConfidence(report){
+            if(!report.flags.length) return Math.max(55, Math.min(92, 100 - Math.abs(report.entropy-3.2)*5));
+            const independent=Math.min(7,new Set(report.flags.map(f=>f.title.split(' ')[0])).size); const score=report.score;
+            return Math.round(Math.min(98, 55 + score*0.35 + independent*4));
+        }
+        function severityForScore(score){ return score>=80?'CRITICAL':score>=60?'HIGH':score>=40?'MEDIUM':score>=25?'ELEVATED':'LOW'; }
+        function normalizeForComparison(raw, parsed){ return parsed.href || raw; }
+
+        // ---------- Main classifier ----------
+        function evaluateUrl(rawInput){
+            let cleanUrl=safeText(rawInput).trim(); if(!cleanUrl)return null;
+            if((cleanUrl.startsWith('"')&&cleanUrl.endsWith('"'))||(cleanUrl.startsWith("'")&&cleanUrl.endsWith("'"))) cleanUrl=cleanUrl.slice(1,-1).trim();
+            if(!cleanUrl)return null;
+            const originalCleanUrl=cleanUrl; const hasScheme=/^[a-z][a-z\d+.-]*:\/\//i.test(cleanUrl); const supported=/^https?:\/\//i.test(cleanUrl);
+            if(!supported){ if(hasScheme)return null; cleanUrl=`http://${cleanUrl}`; }
+            let parsed; try{parsed=new URL(cleanUrl);}catch{return null;}
+            if(!['http:','https:'].includes(parsed.protocol))return null;
+            const rawHostCandidate=extractRawHost(originalCleanUrl)||parsed.hostname; const hostname=normalizeHostnameForAnalysis(parsed.hostname);
+            const pathname=parsed.pathname.toLowerCase(); const search=parsed.search.toLowerCase(); const fullUrl=cleanUrl.toLowerCase(); const isIpHost=isIPAddress(hostname);
+            const flags=[]; let score=0;
+            const idnData=detectHomoglyphsAndPunycode(rawHostCandidate,hostname);
+            if(idnData.isPunycode||idnData.hasHomoglyphs){ if(idnData.spoofedBrand){score+=45;addFlag(flags,'Homoglyph / Punycode Brand Impersonation',`Unmasked spoofing of brand '${idnData.spoofedBrand}' via internationalized characters (${escapeHtml(idnData.decodedUnicode)}).`,45,'danger');} else {score+=25;addFlag(flags,'Internationalized Domain (Punycode / Homoglyph)',`Domain uses non-ASCII or Punycode encoding (${escapeHtml(idnData.decodedUnicode)}).`,25,'warning');} }
+            if(isIpHost){score+=35;addFlag(flags,'Direct IP Host Address','URL targets a numerical IP instead of a conventional registered domain name.',35,'danger');}
+            if(parsed.username||parsed.password){score+=30;addFlag(flags,'Userinfo Obfuscation (@ Symbol)','URL contains a username/password authority component that can disguise the actual destination host.',30,'danger');}
+            if(cleanUrl.length>75){score+=15;addFlag(flags,'Excessive URL Length',`URL contains ${cleanUrl.length} characters. Long URLs can conceal complex paths, parameters or redirects.`,15,'warning');}
+            const hostParts=hostname.split('.').filter(Boolean); const registrableDomain=getRegistrableDomain(hostname); const baseLabel=getBaseDomainLabel(hostname); const subdomainCount=Math.max(0,hostParts.length-registrableDomain.split('.').length);
+            if(subdomainCount>=3&&!isIpHost){score+=15;addFlag(flags,'Deep Subdomain Hierarchy',`Domain contains approximately ${subdomainCount} subdomain levels. Deep nesting can be abused to place trusted-looking words before the real registrable domain.`,15,'warning');}
+            const hyphenCount=(hostname.match(/-/g)||[]).length; if(hyphenCount>=2){score+=15;addFlag(flags,'Multiple Hyphens in Hostname',`Hostname contains ${hyphenCount} hyphens, a pattern sometimes used in deceptive brand-like domains.`,15,'warning');}
+            const matchedTld=SUSPICIOUS_TLDS.find(tld=>hostname.endsWith(tld)); if(matchedTld){score+=20;addFlag(flags,`Abused Top-Level Domain (${matchedTld})`,`The domain uses ${matchedTld}. TLD choice alone is not proof of maliciousness, but it can increase risk when combined with other indicators.`,20,'danger');}
+            const keywordSpace=`${hostname} ${pathname} ${search}`; const matchedKw=PHISHING_KEYWORDS.filter(kw=>keywordSpace.includes(kw)); if(matchedKw.length){const pts=Math.min(25,matchedKw.length*7);score+=pts;addFlag(flags,'Credential / Security Keywords',`Contains security-sensitive terms: [${matchedKw.slice(0,5).join(', ')}].`,pts,matchedKw.length>1?'danger':'warning');}
+            if(!isIpHost){ const compact=normalizeSpoofText(baseLabel).replace(/[^a-z0-9]/g,''); for(const brand of TARGET_BRANDS){if(compact===brand)continue;const dist=calculateLevenshtein(compact,brand);const max=brand.length<=5?1:2;if(compact.length>=4&&dist<=max){score+=30;addFlag(flags,`Brand Typosquatting Detected (${brand.toUpperCase()})`,`Registrable domain label '${escapeHtml(baseLabel)}' is only ${dist} edit${dist===1?'':'s'} from '${brand}'.`,30,'danger');break;}}
+                const lowerSub=hostParts.slice(0,Math.max(0,hostParts.length-registrableDomain.split('.').length)).join('.').toLowerCase(); for(const brand of TARGET_BRANDS){if(lowerSub.includes(brand)){score+=20;addFlag(flags,`Brand Name in Unrelated Subdomain (${brand.toUpperCase()})`,`A protected brand word appears in a subdomain while the registrable domain is '${escapeHtml(registrableDomain)}'.`,20,'danger');break;}}
+            }
+            if(parsed.protocol==='http:'){score+=10;addFlag(flags,'Insecure Transmission Protocol (HTTP)','The target uses HTTP rather than HTTPS. This is a security weakness, not by itself proof of phishing.',10,'neutral');}
+            const entropy=computeShannonEntropy(baseLabel); if(entropy>4.2&&baseLabel.length>=10&&!isIpHost){score+=15;addFlag(flags,'High Shannon Information Entropy',`Registrable label entropy is ${entropy}; high randomness can be consistent with generated or disposable naming.`,15,'warning');}
+            if(parsed.port&&!['80','443'].includes(parsed.port)){score+=10;addFlag(flags,'Non-Standard Web Port',`Target specifies port ${parsed.port}, which is less common for ordinary web browsing.`,10,'warning');}
+            const redirectParamHint=/(?:redirect|redirect_url|return_url|next|continue|destination|target)=/i.test(parsed.search); if(/%(?:2f|5c|40|2e)/i.test(fullUrl)||redirectParamHint){score+=10;addFlag(flags,'Encoded / Redirect-Oriented Parameters','URL contains encoded delimiters or common redirect parameters that can obscure navigation.',10,'warning');}
+
+            // Advanced local features
+            const advanced={rawHost:rawHostCandidate,normalizedUrl:normalizeForComparison(originalCleanUrl,parsed),scripts:detectScripts(hostname),composition:analyzeComposition(hostname),characters:analyzeCharacterMap(hostname),params:analyzeParameters(parsed),path:getPathStats(parsed),randomTokens:detectRandomTokens(`${parsed.pathname}${parsed.search}`),shortener:SHORTENER_DOMAINS.has(hostname),obfuscatedIp:detectObfuscatedIp(rawHostCandidate),normalizationChanged:originalCleanUrl!==parsed.href};
+            if(advanced.obfuscatedIp){score+=25;addFlag(flags,'Obfuscated IP Representation',`${escapeHtml(advanced.obfuscatedIp.original)} is an alternate IPv4 representation for ${advanced.obfuscatedIp.canonical}.`,25,'danger');}
+            if(advanced.shortener){score+=8;addFlag(flags,'Known URL Shortener','The hostname matches a locally maintained list of common URL-shortening services. Destination cannot be resolved in API-free mode.',8,'warning');}
+            if(advanced.params.redirect.length){score+=8;addFlag(flags,'Embedded Redirect Destination',`Detected ${advanced.params.redirect.length} redirect-like parameter${advanced.params.redirect.length===1?'':'s'} that may contain another URL.`,8,'warning');}
+            if(advanced.params.encoded.length){score+=8;addFlag(flags,'Base64-Encoded Parameter Payload','A query parameter resembles Base64 and decodes locally to readable content.',8,'warning');}
+            if(advanced.scripts.length>1){score+=15;addFlag(flags,'Mixed Unicode Scripts',`Hostname mixes scripts: ${advanced.scripts.join(', ')}. Mixed-script names can support lookalike attacks.`,15,'danger');}
+            if(advanced.randomTokens.length>=2){score+=8;addFlag(flags,'Random-Looking URL Tokens',`Found ${advanced.randomTokens.length} long mixed-character token${advanced.randomTokens.length===2?'':'s'} in the path/query.`,8,'warning');}
+            if(advanced.path.extension&&['php','asp','aspx','jsp','cgi','exe','scr','zip','html'].includes(advanced.path.extension)&&matchedKw.length){score+=5;addFlag(flags,'Credential-Like Path With File Extension',`Path ends in .${advanced.path.extension} while also containing security-sensitive keywords.`,5,'warning');}
+            if(baseLabel&&TARGET_BRANDS.includes(baseLabel.toLowerCase())) advanced.brandPosition='brand-label';
+            else if(hostParts.slice(0,-2).some(p=>TARGET_BRANDS.includes(p.replace(/[^a-z0-9]/g,'')))) advanced.brandPosition='subdomain-brand';
+            else advanced.brandPosition='none';
+
+            score=Math.min(100,Math.max(0,score)); const severity=severityForScore(score); let verdict='Safe / Low Risk', verdictClass='emerald', summary='No high-confidence phishing indicators or spoofing artifacts were detected.';
+            if(score>=60){verdict='Phishing / Malicious';verdictClass='rose';summary='Multiple high-risk indicators were detected. Treat this target as unsafe unless independently verified.';}
+            else if(score>=25){verdict='Suspicious / Caution';verdictClass='amber';summary='Anomalous structural or lexical attributes were identified. Exercise caution before authenticating.';}
+            const tld=hostParts.length>1?`.${hostParts.at(-1)}`:'N/A';
+            const iocSeed={rawUrl:safeText(rawInput),cleanUrl,score,verdict,entropy,flags,decomposition:{hostname,domain:registrableDomain||hostname,tld,subdomainCount,pathAndQuery:`${parsed.pathname||'/'}${parsed.search||''}`}};
+            advanced.iocs=extractIocs(iocSeed); advanced.mitre=mapMitre({...iocSeed,isIpHost}); advanced.confidence=calculateConfidence({...iocSeed,flags,score});
+            const report={rawUrl:safeText(rawInput),cleanUrl,score,verdict,verdictClass,verdictSummary:summary,severity,entropy,flags,isIpHost,advanced, decomposition:{protocol:parsed.protocol,hostname,domain:registrableDomain||hostname,tld,subdomainCount,pathAndQuery:`${parsed.pathname||'/'}${parsed.search||''}`},parsedMeta:{username:parsed.username?true:false,hasPassword:parsed.password?true:false,port:parsed.port||'',href:parsed.href}};
+            report.advanced.mitre=mapMitre(report); report.advanced.iocs=extractIocs(report); report.advanced.confidence=calculateConfidence(report);
+            report.timeline=[{time:new Date().toISOString(),event:'URL normalized and parsed locally'},{time:new Date().toISOString(),event:`Heuristic engine completed with score ${report.score}/100`},{time:new Date().toISOString(),event:`${report.flags.length} local indicators evaluated`}];
+            return report;
+        }
+
+        // ---------- Safe report sharing ----------
+        function defangUrlText(value) {
+            return safeText(value).replace(/\bhttps?:\/\/[^\s<>"'`]+/gi, match => {
+                const trailing = (match.match(/[),.;!?]+$/) || [''])[0];
+                const url = trailing ? match.slice(0, -trailing.length) : match;
+                const schemeEnd = url.indexOf('://') + 3;
+                const boundary = url.slice(schemeEnd).search(/[/?#]/);
+                const authorityEnd = boundary < 0 ? url.length : schemeEnd + boundary;
+                const authority = url.slice(schemeEnd, authorityEnd).replace(/\./g, '[.]');
+                return `${url.slice(0, schemeEnd).replace(/^https?/i, scheme => `${scheme.slice(0, 1)}xxp`)}${authority}${url.slice(authorityEnd)}${trailing}`;
+            });
+        }
+        function prepareReportForSharing(value, key = '') {
+            if (Array.isArray(value)) return value.map(item => prepareReportForSharing(item, key));
+            if (value && typeof value === 'object') {
+                return Object.fromEntries(Object.entries(value).map(([name, item]) => [name, prepareReportForSharing(item, name)]));
+            }
+            if (typeof value !== 'string') return value;
+            if (/(?:hosts?|domains?|hostnames?)$/i.test(key)) return value.replace(/\./g, '[.]');
+            return defangUrlText(value);
+        }
+        function reportForSharing(report) {
+            return $('reportDefangToggle').checked ? prepareReportForSharing(report) : report;
+        }
+        function buildCaseReport(report) {
+            const safeReport = reportForSharing(report);
+            const indicators = safeReport.flags.length ? safeReport.flags.map(flag => `- ${flag.title} (${flag.points})`).join('\n') : '- No indicators flagged';
+            const iocs = Object.entries(safeReport.advanced.iocs).map(([type, values]) => `${type.toUpperCase()}: ${values.length ? values.join(', ') : 'None'}`).join('\n');
+            return [
+                'PHISHGUARD LOCAL CASE REPORT',
+                `Investigation: ${safeReport.investigationId}`,
+                `Generated: ${new Date().toISOString()}`,
+                `Target: ${safeReport.parsedMeta.href}`,
+                `Score: ${safeReport.score}/100`,
+                `Verdict: ${safeReport.verdict}`,
+                'Assessment: Heuristic analysis only; not proof of safety or maliciousness.',
+                'Reputation lookups: Not performed. Scan remains in this browser.',
+                '',
+                'Indicators:',
+                indicators,
+                '',
+                'Extracted indicators of compromise:',
+                iocs
+            ].join('\n');
+        }
+
+        // ---------- Local email triage ----------
+        function parseEmailHeaders(emailText) {
+            const sections = safeText(emailText).split(/\r?\n\r?\n/, 2);
+            const headerLines = (sections[0] || '').split(/\r?\n/);
+            const headers = new Map();
+            let currentName = '';
+            let currentValue = '';
+            const saveHeader = () => {
+                if (!currentName) return;
+                const values = headers.get(currentName) || [];
+                values.push(currentValue.trim());
+                headers.set(currentName, values);
+            };
+            for (const line of headerLines) {
+                if (/^[ \t]/.test(line) && currentName) {
+                    currentValue += ` ${line.trim()}`;
+                    continue;
+                }
+                saveHeader();
+                const match = line.match(/^([A-Za-z0-9-]+)\s*:\s*(.*)$/);
+                currentName = match ? match[1].toLowerCase() : '';
+                currentValue = match ? match[2] : '';
+            }
+            saveHeader();
+            return { headers, body: sections.length > 1 ? sections[1] : '' };
+        }
+        function firstEmailAddress(value) {
+            const match = safeText(value).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+            return match ? match[0].toLowerCase() : '';
+        }
+        function emailDomain(address) {
+            const at = safeText(address).lastIndexOf('@');
+            return at < 0 ? '' : safeText(address).slice(at + 1).replace(/[>\s].*$/, '').toLowerCase();
+        }
+        function analyzeEmailText(emailText) {
+            const parsed = parseEmailHeaders(emailText);
+            const header = name => (parsed.headers.get(name) || [])[0] || '';
+            const from = firstEmailAddress(header('from'));
+            const replyTo = firstEmailAddress(header('reply-to'));
+            const returnPath = firstEmailAddress(header('return-path'));
+            const findings = [];
+            const fromDomain = emailDomain(from);
+            for (const [label, address] of [['Reply-To', replyTo], ['Return-Path', returnPath]]) {
+                const domain = emailDomain(address);
+                if (domain && fromDomain && getRegistrableDomain(domain) !== getRegistrableDomain(fromDomain)) {
+                    findings.push({ level: 'warning', text: `${label} domain differs from the From domain (${domain} vs ${fromDomain}).` });
+                }
+            }
+            if (!from) findings.push({ level: 'warning', text: 'No recognizable From email address was found.' });
+            const authHeader = (parsed.headers.get('authentication-results') || []).join(' ');
+            const authResults = [...authHeader.matchAll(/\b(spf|dkim|dmarc)\s*=\s*([a-z0-9_-]+)/gi)];
+            if (!authHeader) findings.push({ level: 'neutral', text: 'No Authentication-Results header was supplied.' });
+            else if (!authResults.length) findings.push({ level: 'neutral', text: 'Authentication-Results was present, but no SPF/DKIM/DMARC result could be parsed.' });
+            for (const [, method, result] of authResults) {
+                const passed = result.toLowerCase() === 'pass';
+                findings.push({ level: passed ? 'good' : 'warning', text: `${method.toUpperCase()} reported ${result.toLowerCase()} (unverified pasted header).` });
+            }
+            const input = safeText(emailText);
+            const links = [...new Set((input.match(/https?:\/\/[^\s<>"'`]+/gi) || []).map(url => url.replace(/[),.;!?]+$/g, '').replace(/&amp;/gi, '&')).filter(Boolean))].slice(0, 200);
+            const linkReports = links.map(url => ({ url, report: evaluateUrl(url) })).filter(item => item.report);
+            const suspiciousLinkCount = linkReports.filter(item => item.report.score >= 25).length;
+            const mismatchCount = findings.filter(item => item.level === 'warning').length;
+            return { from, replyTo, returnPath, subject: header('subject'), findings, linkReports, suspiciousLinkCount, needsReview: mismatchCount > 0 || suspiciousLinkCount > 0 || authResults.some(([, , result]) => result.toLowerCase() !== 'pass') };
+        }
+
+        // ---------- Labeled detection fixtures ----------
+        const DETECTION_FIXTURES = [
+            { url: 'https://www.google.com/', malicious: false },
+            { url: 'https://www.microsoft.com/', malicious: false },
+            { url: 'https://www.wikipedia.org/', malicious: false },
+            { url: 'https://github.com/', malicious: false },
+            { url: 'https://www.mozilla.org/', malicious: false },
+            { url: 'https://support.google.com/accounts/', malicious: false },
+            { url: 'https://paypa1-login-account.xyz/verify', malicious: true },
+            { url: 'https://pаypal.com/signin', malicious: true },
+            { url: 'http://192.168.1.105/banking/signin.php', malicious: true },
+            { url: 'http://legit-brand.com@evil-phish.net/login', malicious: true },
+            { url: 'https://paypal.account-security.example.com/verify', malicious: true },
+            { url: 'https://secure-login.paypal.verify-account.top/auth/signin', malicious: true }
+        ];
+
+        // ---------- History / statistics ----------
+        function loadHistory(){try{const d=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');return Array.isArray(d)?d.filter(Boolean):[];}catch{return[];}}
+        function saveHistoryEntry(report){const h=loadHistory();h.unshift({id:report.investigationId||`PG-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,timestamp:new Date().toISOString(),rawUrl:report.rawUrl,cleanUrl:report.cleanUrl,score:report.score,verdict:report.verdict,entropy:report.entropy,flags:report.flags.map(f=>f.title).slice(0,12)});try{localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(0,150)));}catch{}}
+        function updateStats(){const h=loadHistory(),total=h.length,high=h.filter(x=>Number(x.score)>=60).length,clean=h.filter(x=>Number(x.score)<25).length,avg=total?h.reduce((s,x)=>s+Number(x.entropy||0),0)/total:0;$('statTotalScans').textContent=String(total);$('statHighRisk').textContent=String(high);$('statCleanRate').textContent=`${total?Math.round(clean/total*100):100}%`;$('statAvgEntropy').textContent=avg.toFixed(2);renderTrendCharts(h);}
+        function renderHistory(){const body=$('historyTableBody');if(!body)return;const h=loadHistory();if(!h.length){body.innerHTML='<tr><td colspan="5" class="p-4 text-center text-slate-500">History is currently empty.</td></tr>';updateStats();return;}body.innerHTML=h.slice(0,40).map(i=>{const s=Number(i.score)||0;const cls=s>=60?'text-rose-400':s>=25?'text-amber-400':'text-emerald-400';const safe=escapeHtml(i.cleanUrl);return `<tr><td class="p-3 whitespace-nowrap text-slate-500">${escapeHtml(new Date(i.timestamp).toLocaleString())}</td><td class="p-3 max-w-[420px] truncate" title="${safe}">${safe}</td><td class="p-3 font-bold ${cls}">${s}</td><td class="p-3">${escapeHtml(i.verdict)}</td><td class="p-3 text-right"><button type="button" class="text-cyan-400 hover:text-cyan-300" data-load-url="${safe}">Inspect</button></td></tr>`;}).join('');body.querySelectorAll('[data-load-url]').forEach(btn=>btn.addEventListener('click',()=>{ $('urlInput').value=btn.getAttribute('data-load-url')||'';switchTab('single');triggerSingleScan(); }));updateStats();}
+        function renderTrendCharts(h){
+            const total=h.length,ph=h.filter(x=>Number(x.score)>=60).length,su=h.filter(x=>Number(x.score)>=25&&Number(x.score)<60).length,lo=Math.max(0,total-ph-su);
+            $('trendTotal').textContent=String(total);$('trendPhishing').textContent=String(ph);$('trendSuspicious').textContent=String(su);
+            const make=(label,n,max,cls)=>`<div><div class="flex justify-between mb-1"><span>${label}</span><span>${n}</span></div><div class="h-2 rounded-full bg-cyber-surface overflow-hidden"><div class="h-full ${cls} rounded-full" style="width:${max?Math.round(n/max*100):0}%"></div></div></div>`;
+            const max=Math.max(1,total);$('riskDistributionBars').innerHTML=make('Phishing / malicious',ph,max,'bg-rose-500')+make('Suspicious',su,max,'bg-amber-500')+make('Safe / low risk',lo,max,'bg-emerald-500');
+            const counts=Object.create(null);for(const x of h)for(const f of (x.flags||[]))counts[f]=(counts[f]||0)+1;const top=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6);const rmax=top[0]?.[1]||1;$('topReasonBars').innerHTML=top.length?top.map(([k,n])=>make(k,n,rmax,'bg-cyan-500')).join(''):'<div class="text-slate-500">No historical detection reasons yet.</div>';
+        }
+
+        // ---------- Advanced rendering ----------
+        function getInvestigationId(){return `PG-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;}
+        function buildExplanation(report){
+            if(!report.flags.length)return ['No high-priority structural indicator was triggered by the local engine.'];
+            return report.flags.slice().sort((a,b)=>parseInt(b.points)-parseInt(a.points)).slice(0,8).map((f,i)=>`<div class="flex gap-2"><span class="text-cyan-400 font-bold">${i+1}.</span><div><span class="text-slate-200 font-semibold">${escapeHtml(f.title)}</span><div class="text-slate-500 mt-0.5">${f.desc}</div></div></div>`);
+        }
+        function renderAdvanced(report){
+            $('advancedIntelSection').classList.remove('hidden');$('investigationIdBadge').textContent=`Investigation: ${report.investigationId}`;$('advancedConfidence').textContent=`${report.advanced.confidence}%`;$('advancedScripts').textContent=report.advanced.scripts.join(' + ')||'Latin';
+            $('advancedObfuscation').textContent=String(report.advanced.params.redirect.length+report.advanced.params.encoded.length+(report.advanced.obfuscatedIp?1:0));$('advancedIocCount').textContent=String(Object.values(report.advanced.iocs).reduce((n,a)=>n+a.length,0));$('riskSeverityLabel').textContent=report.severity;
+            $('riskSeverityLabel').className=`text-[10px] font-mono px-2 py-0.5 rounded border ${report.score>=60?'bg-rose-500/10 text-rose-300 border-rose-500/30':report.score>=25?'bg-amber-500/10 text-amber-300 border-amber-500/30':'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'}`;
+            $('explanationContainer').innerHTML=buildExplanation(report).join('');
+            const max=Math.max(1,...report.flags.map(f=>parseInt(f.points)||0));$('riskDriversContainer').innerHTML=report.flags.length?report.flags.slice().sort((a,b)=>parseInt(b.points)-parseInt(a.points)).slice(0,8).map(f=>`<div><div class="flex justify-between gap-3 mb-1"><span class="truncate">${escapeHtml(f.title)}</span><span class="font-bold">${escapeHtml(f.points)}</span></div><div class="h-1.5 rounded-full bg-cyber-dark overflow-hidden"><div class="h-full bg-cyan-500 rounded-full" style="width:${Math.min(100,Math.round((parseInt(f.points)||0)/max*100))}%"></div></div></div>`).join(''):'<div class="text-slate-500">No active risk drivers.</div>';
+            $('rawUrlAdvanced').textContent=report.rawUrl;$('normalizedUrlAdvanced').textContent=report.parsedMeta.href;$('normalizationBadge').textContent=report.advanced.normalizationChanged?'Normalized':'No change';
+            const ipbox=$('obfuscatedIpBox');if(report.advanced.obfuscatedIp){ipbox.classList.remove('hidden');$('obfuscatedIpDetails').textContent=`${report.advanced.obfuscatedIp.original} → ${report.advanced.obfuscatedIp.canonical} (${report.advanced.obfuscatedIp.reason})`;}else ipbox.classList.add('hidden');
+            const ep=$('encodedPayloadBox');if(report.advanced.params.encoded.length||report.advanced.params.redirect.length){ep.classList.remove('hidden');const parts=[];report.advanced.params.redirect.forEach(x=>parts.push(`${x.key} → ${x.decodedUrl}`));report.advanced.params.encoded.forEach(x=>parts.push(`${x.key} → ${x.decoded}`));$('encodedPayloadDetails').textContent=parts.slice(0,8).join(' | ');}else ep.classList.add('hidden');
+            const labels=report.decomposition.hostname.split('.').filter(Boolean);const rdLabels=report.decomposition.domain.split('.').filter(Boolean).length;const sub=Math.max(0,labels.length-rdLabels);$('domainStructureVisual').innerHTML=labels.map((l,i)=>{const kind=i<sub?'subdomain':i===labels.length-2?'domain':'tld';const cls=kind==='subdomain'?'border-blue-500/20 text-blue-300':kind==='domain'?'border-cyan-500/20 text-cyan-300':'border-emerald-500/20 text-emerald-300';return `<span class="inline-flex items-center gap-1 px-2 py-1 mr-1 mb-1 rounded-lg bg-cyber-surface border ${cls}">${escapeHtml(l)}<small class="text-[8px] opacity-60">${kind}</small></span>`;}).join('')||'—';
+            $('structureLabels').textContent=String(labels.length);$('structureDigits').textContent=String((report.decomposition.hostname.match(/\d/g)||[]).length);$('structureHyphens').textContent=String((report.decomposition.hostname.match(/-/g)||[]).length);$('structureDepth').textContent=String(report.decomposition.subdomainCount);
+            $('unicodeScriptsList').textContent=report.advanced.scripts.join(', ')||'Latin'; const c=report.advanced.composition;$('compositionStats').innerHTML=`<div>Letters: ${c.letters} (${c.letterPct}%)</div><div>Digits: ${c.digits} (${c.digitPct}%)</div><div>Symbols: ${c.symbols} (${c.symbolPct}%)</div><div>Length: ${c.length}</div>`;
+            $('characterInspector').innerHTML=report.advanced.characters.length?report.advanced.characters.map(r=>`<div class="flex flex-wrap gap-2"><span class="text-rose-300">${escapeHtml(r.char)}</span><span>${r.code}</span><span>${escapeHtml(r.scripts)}</span><span class="text-cyan-300">→ ${escapeHtml(r.mapped)}</span></div>`).join(''):'<span class="text-slate-500">No non-ASCII or mapped homoglyph characters found.</span>';
+            const path=report.advanced.path;$('pathDepthValue').textContent=String(path.depth);$('paramCountValue').textContent=String(report.advanced.params.params.length);$('randomTokenValue').textContent=String(report.advanced.randomTokens.length);$('portValue').textContent=report.parsedMeta.port||'Default';
+            $('parameterAnalysis').innerHTML=report.advanced.params.params.length?report.advanced.params.params.map(p=>`<div class="p-2 rounded-lg bg-cyber-surface border border-cyber-border"><span class="text-cyan-300">${escapeHtml(p.key)}</span><span class="text-slate-500"> = ${escapeHtml(p.value)}</span>${p.redirectLike?'<span class="ml-2 text-rose-300">redirect-like</span>':''}${p.base64?'<span class="ml-2 text-amber-300">base64-like</span>':''}</div>`).join(''):'<div class="text-slate-500">No query parameters detected.</div>';
+            renderIocs(report); renderMitre(report); renderTimeline(report); loadAssessment(report); renderTrendCharts(loadHistory());
+        }
+        function renderIocs(report){
+            const groups=[['URLs',report.advanced.iocs.urls],['Domains',report.advanced.iocs.domains],['IPs',report.advanced.iocs.ips],['Emails',report.advanced.iocs.emails]];$('iocContainer').innerHTML=groups.map(([name,arr])=>`<div><div class="text-slate-500 uppercase mb-1">${name}</div><div class="flex flex-wrap gap-1">${arr.length?arr.map(v=>`<span class="px-2 py-1 rounded bg-cyber-surface border border-cyber-border break-all">${escapeHtml(v)}</span>`).join(''):'<span class="text-slate-600">None</span>'}</div></div>`).join('');
+        }
+        function renderMitre(report){ $('mitreContainer').innerHTML=report.advanced.mitre.length?report.advanced.mitre.map(x=>`<div class="p-2 rounded-lg bg-cyber-surface border border-cyber-border"><span class="text-cyan-300 font-bold">${escapeHtml(x.id)}</span><span class="ml-2 text-slate-300">${escapeHtml(x.name)}</span></div>`).join(''):'<div class="text-slate-500 text-[11px]">No local MITRE mapping rule matched.</div>'; }
+        function renderTimeline(report){ $('timelineContainer').innerHTML=report.timeline.map(x=>`<div class="flex gap-3"><span class="text-slate-600">${new Date(x.time).toLocaleTimeString()}</span><span class="text-slate-400">${escapeHtml(x.event)}</span></div>`).join(''); }
+        function assessmentStore(){try{return JSON.parse(localStorage.getItem(ASSESSMENT_KEY)||'{}');}catch{return{};}}
+        function loadAssessment(report){const all=assessmentStore();const a=all[report.investigationId]||{};selectedAnalystVerdict=a.verdict||'';$('analystNotes').value=a.notes||'';document.querySelectorAll('.analyst-btn').forEach(b=>{const active=b.dataset.analystValue===selectedAnalystVerdict;b.classList.toggle('ring-1',active);b.classList.toggle('ring-cyan-400',active);b.classList.toggle('text-cyan-300',active);});}
+        function saveAssessment(){if(!lastAnalysisReport)return;const all=assessmentStore();all[lastAnalysisReport.investigationId]={verdict:selectedAnalystVerdict,notes:$('analystNotes').value.trim(),savedAt:new Date().toISOString()};try{localStorage.setItem(ASSESSMENT_KEY,JSON.stringify(all));showToast('Analyst assessment saved locally.','success');}catch{showToast('Local storage is unavailable.','error');}}
+        function createStix(report){
+            const now=new Date().toISOString(); const indicators=[];
+            if(report.decomposition.hostname)indicators.push({type:'indicator',spec_version:'2.1',id:`indicator--${crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)}`,created:now,modified:now,name:'PhishGuard domain indicator',pattern:`[domain-name:value = '${report.decomposition.hostname.replace(/'/g,"\\'")}']`,pattern_type:'stix',valid_from:now,labels:['phishing','phishguard'],confidence:report.advanced.confidence,description:`Local API-free analysis score ${report.score}/100. ${report.verdict}.`});
+            report.advanced.iocs.ips.forEach(ip=>indicators.push({type:'indicator',spec_version:'2.1',id:`indicator--${crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)}`,created:now,modified:now,name:'PhishGuard IP indicator',pattern:`[ipv4-addr:value = '${ip}']`,pattern_type:'stix',valid_from:now,labels:['phishing-infrastructure'],confidence:report.advanced.confidence}));
+            return JSON.stringify({type:'bundle',id:`bundle--${crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)}`,objects:indicators},null,2);
+        }
+
+        // ---------- Main report UI ----------
+        function updateGauge(score,verdictClass){const c=$('gaugeProgress'),t=$('gaugeScoreText');if(!c||!t)return;const circ=314.16;c.style.strokeDasharray=String(circ);c.style.strokeDashoffset=String(circ-circ*score/100);c.setAttribute('stroke',verdictClass==='rose'?'#f43f5e':verdictClass==='amber'?'#f59e0b':'#10b981');t.textContent=String(score);}
+        function renderFlags(report){const container=$('flagsContainer'),empty=$('noFlagsMessage'),badge=$('flagsCountBadge');if(!container||!empty||!badge)return;badge.textContent=`${report.flags.length} Flagged`;container.innerHTML='';empty.classList.toggle('hidden',report.flags.length!==0);if(!report.flags.length)return;const tm={danger:{border:'border-rose-500/25',bg:'bg-rose-500/5',title:'text-rose-300',icon:'text-rose-400'},warning:{border:'border-amber-500/25',bg:'bg-amber-500/5',title:'text-amber-300',icon:'text-amber-400'},neutral:{border:'border-slate-500/25',bg:'bg-slate-500/5',title:'text-slate-200',icon:'text-slate-400'}};for(const f of report.flags){const s=tm[f.type]||tm.warning;const div=document.createElement('div');div.className=`p-3 rounded-xl border ${s.border} ${s.bg}`;div.innerHTML=`<div class="flex items-start justify-between gap-3"><div class="min-w-0"><div class="text-xs font-bold ${s.title}">${escapeHtml(f.title)}</div><div class="text-[11px] text-slate-400 mt-1 leading-relaxed">${f.desc}</div></div><span class="shrink-0 text-[10px] font-mono font-bold ${s.icon}">${escapeHtml(f.points)}</span></div>`;container.appendChild(div);}}
+        function renderReport(report){
+            report.investigationId=getInvestigationId(); lastAnalysisReport=report; $('resultContainer').classList.remove('hidden'); updateGauge(report.score,report.verdictClass); $('verdictBadge').textContent=report.verdict;$('verdictSummary').textContent=report.verdictSummary;
+            const vc={emerald:'px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',amber:'px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-2 bg-amber-500/20 text-amber-300 border border-amber-500/30',rose:'px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-2 bg-rose-500/20 text-rose-300 border border-rose-500/30'}; $('verdictBadge').className=vc[report.verdictClass]||vc.emerald;
+            $('decompProtocol').textContent=report.decomposition.protocol;$('decompHost').textContent=report.decomposition.hostname;$('decompDomain').textContent=report.decomposition.domain;$('decompTld').textContent=report.decomposition.tld;$('decompSubdomains').textContent=String(report.decomposition.subdomainCount);$('decompPath').textContent=report.decomposition.pathAndQuery;$('entropyValue').textContent=report.entropy.toFixed(3);$('entropyBar').style.width=`${Math.min(100,Math.round(report.entropy/6*100))}%`;$('entropyDesc').textContent=report.entropy>4.2?'Elevated randomness in the registrable domain label. This can be consistent with generated or disposable naming.':'Entropy is within a more typical range for human-readable domain labels.';
+            renderFlags(report); updateLocalDnsPanel(report); renderAdvanced(report); $('aiSummaryContainer').innerHTML=`<div class="flex items-center gap-2 text-slate-400 italic"><span>API-free local briefing ready for <span class="text-slate-200 not-italic">${escapeHtml(report.decomposition.hostname)}</span>.</span></div>`;
+        }
+        window.triggerSingleScan=function(){const input=$('urlInput'),btn=$('scanBtn'),report=evaluateUrl(input.value);if(!report){$('resultContainer').classList.add('hidden');$('advancedIntelSection').classList.add('hidden');showToast('Enter a valid HTTP(S) URL or hostname. Unsupported schemes are rejected.','error');input.focus();return;}if(btn)btn.disabled=true;try{renderReport(report);saveHistoryEntry(report);renderHistory();showToast(`${report.verdict} — score ${report.score}/100`,report.score>=60?'error':report.score>=25?'info':'success');window.scrollTo({top:Math.max(0,$('resultContainer').offsetTop-100),behavior:'smooth'});}finally{setTimeout(()=>{if(btn)btn.disabled=false;},350);}};
+        window.loadPreset=function(url){$('urlInput').value=url;triggerSingleScan();};
+        $('copyReportBtn').addEventListener('click',async()=>{if(!lastAnalysisReport)return showToast('Run a scan first.','error');const copied=await copyText(JSON.stringify(reportForSharing(lastAnalysisReport),null,2));showToast(copied?'JSON report copied.':'Copy failed.',copied?'success':'error');});
+        $('exportCaseReportBtn').addEventListener('click',()=>{if(!lastAnalysisReport)return showToast('Run a scan first.','error');downloadText(`${lastAnalysisReport.investigationId}-case-report.txt`,buildCaseReport(lastAnalysisReport));showToast('Case report exported.','success');});
+        $('exportIocsBtn').addEventListener('click',()=>{if(!lastAnalysisReport)return showToast('Run a scan first.','error');const report=reportForSharing(lastAnalysisReport);const payload={schemaVersion:'1.0',investigationId:report.investigationId,generatedAt:new Date().toISOString(),score:report.score,verdict:report.verdict,assessment:'Local heuristic indicators only; not verified against external reputation sources.',iocs:report.advanced.iocs};downloadText(`${lastAnalysisReport.investigationId}-iocs.json`,JSON.stringify(payload,null,2),'application/json;charset=utf-8');showToast('IOC JSON exported.','success');});
+
+        function renderEmailAnalysis() {
+            const input=$('emailInput').value;
+            if(!input.trim())return showToast('Paste an email header and body to analyze.','error');
+            const result=analyzeEmailText(input);
+            $('emailResult').classList.remove('hidden');
+            $('emailSummary').textContent=`${result.needsReview?'Review recommended':'No high-risk indicators found by these local checks'}${result.subject?` — Subject: ${result.subject}`:''} | Sender: ${result.from||'not identified'} | ${result.linkReports.length} URL(s) inspected, ${result.suspiciousLinkCount} at or above score 25.`;
+            $('emailSummary').className=`p-4 rounded-xl border ${result.needsReview?'border-amber-500/30 bg-amber-500/5 text-amber-200':'border-emerald-500/30 bg-emerald-500/5 text-emerald-200'}`;
+            const findingClass={warning:'text-amber-300',good:'text-emerald-300',neutral:'text-slate-400'};
+            $('emailHeaderFindings').innerHTML=result.findings.map(item=>`<div class="flex gap-2"><span class="${findingClass[item.level]}">•</span><span>${escapeHtml(item.text)}</span></div>`).join('');
+            $('emailLinksSummary').textContent=result.linkReports.length?`${result.linkReports.length} unique HTTP(S) links analyzed locally. Links are displayed as text and are not opened.`:'No HTTP(S) links found in the pasted text.';
+            const body=$('emailLinksBody');
+            body.innerHTML=result.linkReports.length?result.linkReports.map((item,index)=>{
+                const score=item.report.score, color=score>=60?'text-rose-400':score>=25?'text-amber-400':'text-emerald-400';
+                return `<tr><td class="p-3 max-w-[540px] break-all">${escapeHtml(item.url)}</td><td class="p-3 font-bold ${color}">${score}</td><td class="p-3">${escapeHtml(item.report.verdict)}</td><td class="p-3 text-right"><button type="button" class="text-cyan-400 hover:text-cyan-300" data-inspect-email-link="${index}">Inspect</button></td></tr>`;
+            }).join(''):'<tr><td colspan="4" class="p-4 text-center text-slate-500">No scannable HTTP(S) links found.</td></tr>';
+            body.querySelectorAll('[data-inspect-email-link]').forEach(button=>button.addEventListener('click',()=>{
+                const item=result.linkReports[Number(button.getAttribute('data-inspect-email-link'))];
+                if(!item)return showToast('The selected email link is unavailable.','error');
+                $('urlInput').value=item.url;switchTab('single');triggerSingleScan();
+            }));
+        }
+        $('analyzeEmailBtn').addEventListener('click',renderEmailAnalysis);
+
+        function runDetectionTests() {
+            const threshold=Number($('testThreshold').value);
+            if(!Number.isInteger(threshold)||threshold<0||threshold>100)return showToast('Choose a whole-number threshold from 0 to 100.','error');
+            let tp=0,fp=0,tn=0,fn=0;
+            const rows=DETECTION_FIXTURES.map(fixture=>{
+                const report=evaluateUrl(fixture.url);
+                if(!report)throw new Error(`Invalid built-in detection fixture: ${fixture.url}`);
+                const predicted=report.score>=threshold;
+                if(fixture.malicious&&predicted)tp++;else if(!fixture.malicious&&predicted)fp++;else if(!fixture.malicious)tn++;else fn++;
+                return {fixture,report,predicted,matched:predicted===fixture.malicious};
+            });
+            const precision=tp+fp?tp/(tp+fp):0,recall=tp+fn?tp/(tp+fn):0,accuracy=(tp+tn)/rows.length,f1=precision+recall?2*precision*recall/(precision+recall):0;
+            const pct=value=>`${(value*100).toFixed(1)}%`;
+            $('testMetrics').classList.remove('hidden');
+            $('testMetrics').innerHTML=`<div class="grid grid-cols-2 md:grid-cols-4 gap-3"><div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border"><div class="text-[10px] uppercase text-slate-500">Precision</div><div class="text-lg font-bold font-mono text-cyan-300">${pct(precision)}</div></div><div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border"><div class="text-[10px] uppercase text-slate-500">Recall</div><div class="text-lg font-bold font-mono text-cyan-300">${pct(recall)}</div></div><div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border"><div class="text-[10px] uppercase text-slate-500">Accuracy</div><div class="text-lg font-bold font-mono text-cyan-300">${pct(accuracy)}</div></div><div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border"><div class="text-[10px] uppercase text-slate-500">F1 score</div><div class="text-lg font-bold font-mono text-cyan-300">${pct(f1)}</div></div></div><p class="mt-3 text-[10px] text-slate-500">Threshold ${threshold}; TP ${tp} · FP ${fp} · TN ${tn} · FN ${fn}. These demo fixtures are not a representative benchmark.</p>`;
+            $('testResultsBody').innerHTML=rows.map(({fixture,report,predicted,matched})=>`<tr><td class="p-3 max-w-[460px] break-all">${escapeHtml(fixture.url)}</td><td class="p-3">${fixture.malicious?'Flagged':'Benign'}</td><td class="p-3">${report.score}</td><td class="p-3">${predicted?'Flagged':'Not flagged'}</td><td class="p-3 ${matched?'text-emerald-400':'text-rose-400'}">${matched?'MATCH':'MISS'}</td></tr>`).join('');
+            showToast(`Test set complete: ${rows.length} labeled URLs.`, 'success');
+        }
+        $('runDetectionTestsBtn').addEventListener('click',runDetectionTests);
+
+        // ---------- Tabs / DNS status ----------
+        window.switchTab=function(tab){const views={single:$('singleView'),qr:$('qrView'),batch:$('batchView'),email:$('emailView'),tests:$('testsView')},tabs={single:$('singleScanTab'),qr:$('qrScanTab'),batch:$('batchScanTab'),email:$('emailScanTab'),tests:$('testAuditTab')};if(!views[tab])return;Object.keys(views).forEach(k=>views[k].classList.toggle('hidden',k!==tab));Object.keys(tabs).forEach(k=>{const a=k===tab;tabs[k].classList.toggle('border-cyan-400',a);tabs[k].classList.toggle('text-cyan-300',a);tabs[k].classList.toggle('border-transparent',!a);tabs[k].classList.toggle('text-slate-400',!a);});if(tab!=='qr')stopQrCamera();};
+        function updateLocalDnsPanel(report){const s=$('dohStatus'),ip=$('dohIpAnswer'),mx=$('dohMxAnswer');if(!s||!ip||!mx)return;s.textContent=report.isIpHost?'Local Only':'Not Queried';s.className='text-[11px] font-mono px-2 py-0.5 rounded bg-slate-500/10 text-slate-300 border border-slate-500/30';ip.textContent=report.isIpHost?`${report.decomposition.hostname} (supplied directly)`:'Disabled in API-free mode';mx.textContent=report.isIpHost?'Not applicable to direct IP target':'Disabled in API-free mode';}
+
+        // ---------- QR ----------
+        function classifyQrPayload(text){const s=safeText(text).trim();if(/^https?:\/\//i.test(s))return 'HTTP(S) URL';if(/^WIFI:/i.test(s))return 'Wi-Fi configuration';if(/^BEGIN:VCARD/i.test(s))return 'vCard';if(/^mailto:/i.test(s))return 'Email';if(/^SMSTO:|^sms:/i.test(s))return 'SMS';if(/^tel:/i.test(s))return 'Telephone';if(/^(bitcoin:|ethereum:)/i.test(s))return 'Crypto URI';return 'Plain text / unknown';}
+        function showQrResult(text){$('qrDecodedText').textContent=text;$('qrResultBox').classList.remove('hidden');const isUrl=/^https?:\/\//i.test(text.trim());$('qrScanExtractedBtn').classList.toggle('hidden',!isUrl);let meta=$('qrPayloadMeta');if(!meta){meta=document.createElement('div');meta.id='qrPayloadMeta';meta.className='text-[10px] font-mono text-slate-500';$('qrResultBox').appendChild(meta);}meta.textContent=`Payload type: ${classifyQrPayload(text)}`;}
+        function scanCanvasForQr(){if(!qrScanningActive||!videoStream)return;const v=$('qrVideo'),c=$('qrCanvas');if(!v.videoWidth||!v.videoHeight){qrAnimFrameId=requestAnimationFrame(scanCanvasForQr);return;}c.width=v.videoWidth;c.height=v.videoHeight;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(v,0,0,c.width,c.height);const img=ctx.getImageData(0,0,c.width,c.height);if(typeof jsQR==='function'){const code=jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});if(code?.data){showQrResult(code.data);showToast('QR code decoded successfully.','success');stopQrCamera();return;}}qrAnimFrameId=requestAnimationFrame(scanCanvasForQr);}
+        async function startQrCamera(){if(!navigator.mediaDevices?.getUserMedia){showToast('Webcam access is unavailable here. Use image upload or a local HTTPS/localhost context.','error');return;}try{videoStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});const v=$('qrVideo');v.srcObject=videoStream;await v.play();qrScanningActive=true;$('qrVideoContainer').classList.remove('hidden');$('cameraBtnText').textContent='Stop Webcam Scanner';qrAnimFrameId=requestAnimationFrame(scanCanvasForQr);}catch(e){showToast(e?.name==='NotAllowedError'?'Camera permission was denied.':'Unable to start webcam scanner.','error');stopQrCamera();}}
+        function stopQrCamera(){qrScanningActive=false;if(qrAnimFrameId)cancelAnimationFrame(qrAnimFrameId);qrAnimFrameId=null;if(videoStream){for(const t of videoStream.getTracks())t.stop();videoStream=null;}const v=$('qrVideo');if(v)v.srcObject=null;$('qrVideoContainer')?.classList.add('hidden');if($('cameraBtnText'))$('cameraBtnText').textContent='Start Webcam Scanner';}
+        $('qrCameraToggle').addEventListener('click',()=>{if(qrScanningActive)stopQrCamera();else startQrCamera();});
+        $('qrFileInput').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;if(!file.type.startsWith('image/')){showToast('Please choose a valid image file.','error');return;}try{if(typeof createImageBitmap!=='function')throw new Error('Image decoding is unavailable in this browser.');const bitmap=await createImageBitmap(file),canvas=$('qrCanvas'),scale=Math.min(1,1800/Math.max(bitmap.width,bitmap.height));canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();const image=ctx.getImageData(0,0,canvas.width,canvas.height);const code=typeof jsQR==='function'?jsQR(image.data,image.width,image.height,{inversionAttempts:'attemptBoth'}):null;if(!code?.data)throw new Error('No readable QR code was detected in the image.');showQrResult(code.data);showToast('QR code decoded successfully.','success');}catch(err){$('qrResultBox').classList.add('hidden');showToast(err?.message||'QR scan failed.','error');}finally{e.target.value='';}});
+        $('qrScanExtractedBtn').addEventListener('click',()=>{const text=$('qrDecodedText').textContent.trim();if(!/^https?:\/\//i.test(text)){showToast('The QR payload is not an HTTP(S) URL.','error');return;}$('urlInput').value=text;switchTab('single');triggerSingleScan();});
+
+        // ---------- Batch ----------
+        function renderBatchResults(){const body=$('batchResultsTableBody');if(!body)return;if(!batchResults.length){body.innerHTML='<tr><td colspan="5" class="p-4 text-center text-slate-500">No batch analysis executed yet.</td></tr>';return;}body.innerHTML=batchResults.map(r=>{const c=r.score>=60?'text-rose-400':r.score>=25?'text-amber-400':'text-emerald-400';return `<tr><td class="p-3 max-w-[360px] truncate" title="${escapeHtml(r.target)}">${escapeHtml(r.target)}</td><td class="p-3 font-bold ${c}">${r.score}</td><td class="p-3">${escapeHtml(r.verdict)}</td><td class="p-3">${Number(r.entropy).toFixed(3)}</td><td class="p-3">${r.flags.length}</td></tr>`;}).join('');}
+        async function runBatchAudit(){const lines=$('batchUrlsInput').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);if(!lines.length)return showToast('Paste at least one URL or hostname.','error');const unique=[...new Set(lines)].slice(0,500),progress=$('batchProgress'),count=$('batchProgressCount'),button=$('runBatchBtn');progress.classList.remove('hidden');button.disabled=true;batchResults=[];for(let i=0;i<unique.length;i++){const target=unique[i],report=evaluateUrl(target);if(report){batchResults.push({target:report.decomposition.hostname,score:report.score,verdict:report.verdict,entropy:report.entropy,flags:report.flags});saveHistoryEntry(report);}else batchResults.push({target,score:0,verdict:'Invalid URL',entropy:0,flags:[]});count.textContent=`${i+1}/${unique.length}`;renderBatchResults();await new Promise(r=>setTimeout(r,0));}button.disabled=false;progress.classList.add('hidden');renderHistory();showToast(`Batch audit complete: ${batchResults.length} rows.`,'success');}
+        $('runBatchBtn').addEventListener('click',runBatchAudit);
+        function csvSafe(v){let t=safeText(v);if(/^[=+\-@]/.test(t))t=`'${t}`;return `"${t.replace(/"/g,'""')}"`;}
+        $('exportCsvBtn').addEventListener('click',()=>{if(!batchResults.length)return showToast('Run a batch audit before exporting.','error');const rows=[['Target Domain / Host','Risk Score','Verdict','Entropy','Flags Triggered'],...batchResults.map(r=>[r.target,r.score,r.verdict,Number(r.entropy).toFixed(3),r.flags.length])];downloadText(`phishguard-audit-${new Date().toISOString().slice(0,10)}.csv`,rows.map(r=>r.map(csvSafe).join(',')).join('\r\n'),'text/csv;charset=utf-8');showToast('CSV export created.','success');});
+
+        // ---------- Local SOC briefing ----------
+        function buildLocalBriefing(report){const actions=report.score>=60?'Do not authenticate. Preserve the URL as evidence, block the hostname where appropriate, and verify the claimed service through a known-good channel.':report.score>=25?'Do not enter credentials until the domain is independently verified. Review the registrable domain and all flagged indicators.':'No major structural indicator was detected. Continue normal caution before sharing credentials or sensitive information.';const details=report.flags.length?report.flags.slice(0,6).map((f,i)=>`${i+1}. ${f.title}: ${f.desc}`).join('\n'):'1. No suspicious indicators were triggered.';return `<div><span class="text-cyan-400">Mode:</span> API-free local analysis</div><div><span class="text-cyan-400">Severity:</span> ${escapeHtml(report.severity)}</div><div><span class="text-cyan-400">Risk score:</span> ${report.score}/100</div><div><span class="text-cyan-400">Confidence:</span> ${report.advanced.confidence}%</div><div><span class="text-cyan-400">Target:</span> ${escapeHtml(report.decomposition.hostname)}</div><div><span class="text-cyan-400">Recommended action:</span> ${escapeHtml(actions)}</div><div class="pt-3 border-t border-cyber-border"><span class="text-cyan-400">Evidence detail:</span><div class="mt-1 whitespace-pre-wrap text-slate-400">${escapeHtml(details)}</div></div>`;}
+        $('generateAiBtn').addEventListener('click',()=>{if(!lastAnalysisReport)return showToast('Run a URL scan before generating a briefing.','error');const c=$('aiSummaryContainer'),b=$('generateAiBtn');b.disabled=true;c.innerHTML='<div class="text-slate-400 italic">Generating local SOC briefing...</div>';try{c.innerHTML=buildLocalBriefing(lastAnalysisReport);showToast('Local SOC briefing generated.','success');}finally{b.disabled=false;}});
+
+        // ---------- Advanced controls ----------
+        document.querySelectorAll('.analyst-btn').forEach(btn=>btn.addEventListener('click',()=>{selectedAnalystVerdict=btn.dataset.analystValue||'';document.querySelectorAll('.analyst-btn').forEach(b=>{const active=b===btn;b.classList.toggle('ring-1',active);b.classList.toggle('ring-cyan-400',active);b.classList.toggle('text-cyan-300',active);});}));
+        $('saveAnalystBtn').addEventListener('click',saveAssessment);
+        $('copyIocBtn').addEventListener('click',async()=>{if(!lastAnalysisReport)return showToast('Run a scan first.','error');const iocs=reportForSharing(lastAnalysisReport).advanced.iocs;const flat=Object.entries(iocs).flatMap(([k,v])=>v.map(x=>`${k}: ${x}`));const copied=await copyText(flat.join('\n'));showToast(copied?'IOCs copied.':'Copy failed.',copied?'success':'error');});
+        $('copyNormalizedBtn').addEventListener('click',async()=>{if(!lastAnalysisReport)return showToast('Run a scan first.','error');const url=$('reportDefangToggle').checked?defangUrlText(lastAnalysisReport.parsedMeta.href):lastAnalysisReport.parsedMeta.href;const copied=await copyText(url);showToast(copied?'Normalized URL copied.':'Copy failed.',copied?'success':'error');});
+        $('exportStixBtn').addEventListener('click',()=>{if(!lastAnalysisReport)return showToast('Run a scan first.','error');downloadText(`${lastAnalysisReport.investigationId}-stix.json`,createStix(lastAnalysisReport),'application/json;charset=utf-8');showToast('STIX 2.1 bundle exported.','success');});
+
+        // ---------- Local URL comparison ----------
+        function compareReports(a, b){
+            const differences=[];
+            if(a.decomposition.hostname!==b.decomposition.hostname)differences.push(['Hostname',a.decomposition.hostname,b.decomposition.hostname]);
+            if(a.decomposition.domain!==b.decomposition.domain)differences.push(['Registrable domain',a.decomposition.domain,b.decomposition.domain]);
+            if(a.decomposition.tld!==b.decomposition.tld)differences.push(['TLD',a.decomposition.tld,b.decomposition.tld]);
+            if(a.decomposition.protocol!==b.decomposition.protocol)differences.push(['Protocol',a.decomposition.protocol,b.decomposition.protocol]);
+            if(a.score!==b.score)differences.push(['Risk score',String(a.score),String(b.score)]);
+            if(a.advanced.scripts.join(',')!==b.advanced.scripts.join(','))differences.push(['Scripts',a.advanced.scripts.join(', '),b.advanced.scripts.join(', ')]);
+            if(a.advanced.shortener!==b.advanced.shortener)differences.push(['Shortener',a.advanced.shortener?'YES':'NO',b.advanced.shortener?'YES':'NO']);
+            if(a.flags.length!==b.flags.length)differences.push(['Flag count',String(a.flags.length),String(b.flags.length)]);
+            return differences;
+        }
+        $('compareCurrentBtn').addEventListener('click',()=>{
+            if(!lastAnalysisReport)return showToast('Run a scan before comparing URLs.','error');
+            const other=$('compareOtherUrl').value.trim();
+            if(!other)return showToast('Enter the second URL.','error');
+            const b=evaluateUrl(other);if(!b)return showToast('The comparison URL is invalid or uses an unsupported scheme.','error');
+            const a=lastAnalysisReport, diffs=compareReports(a,b);
+            $('compareCurrentUrl').textContent=a.parsedMeta.href;
+            $('comparisonResult').classList.remove('hidden');
+            $('comparisonResult').innerHTML=`<div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border"><div class="text-[10px] uppercase text-slate-500">Current</div><div class="mt-1 font-mono text-sm font-bold ${a.score>=60?'text-rose-300':a.score>=25?'text-amber-300':'text-emerald-300'}">${a.score}/100</div><div class="text-[10px] text-slate-400 mt-1">${escapeHtml(a.verdict)}</div></div><div class="p-3 rounded-xl bg-cyber-surface border border-cyber-border"><div class="text-[10px] uppercase text-slate-500">Comparison</div><div class="mt-1 font-mono text-sm font-bold ${b.score>=60?'text-rose-300':b.score>=25?'text-amber-300':'text-emerald-300'}">${b.score}/100</div><div class="text-[10px] text-slate-400 mt-1">${escapeHtml(b.verdict)}</div></div></div><div class="mt-3 overflow-x-auto rounded-xl border border-cyber-border"><table class="w-full text-left text-[10px] font-mono"><thead class="bg-cyber-surface text-slate-500 uppercase"><tr><th class="p-2">Attribute</th><th class="p-2">Current</th><th class="p-2">Comparison</th></tr></thead><tbody>${diffs.length?diffs.map(d=>`<tr class="border-t border-cyber-border"><td class="p-2 text-slate-400">${escapeHtml(d[0])}</td><td class="p-2 break-all">${escapeHtml(d[1])}</td><td class="p-2 break-all">${escapeHtml(d[2])}</td></tr>`).join(''):'<tr><td colspan="3" class="p-3 text-center text-slate-500">No analyzed differences in the selected attributes.</td></tr>'}</tbody></table></div>`;
+        });
+
+        $('clearHistoryBtn').addEventListener('click',()=>{if(!confirm('Clear the saved investigation history and statistics?'))return;try{localStorage.removeItem(HISTORY_KEY);localStorage.removeItem(ASSESSMENT_KEY);}catch{}renderHistory();showToast('Investigation history cleared.','success');});
+
+        // ---------- Offline support ----------
+        async function registerOfflineSupport() {
+            const status=$('offlineStatus');
+            if(location.protocol==='file:'){status.textContent='Offline assets bundled • service worker needs localhost/HTTPS';return;}
+            if(!('serviceWorker' in navigator)){status.textContent='Offline assets bundled • service worker unsupported';return;}
+            try{
+                const registration=await navigator.serviceWorker.register('./service-worker.js');
+                status.textContent=registration.active?'Offline cache active':'Offline cache installing';
+                registration.addEventListener('updatefound',()=>{status.textContent='Caching offline app assets';});
+                navigator.serviceWorker.addEventListener('controllerchange',()=>{status.textContent='Offline cache active';});
+            }catch(error){
+                console.error('Offline service worker registration failed:',error);
+                status.textContent='Offline cache unavailable';
+                showToast('Offline cache could not be enabled. Serve this folder via localhost or HTTPS.','error');
+            }
+        }
+
+        // ---------- Initialization ----------
+        document.addEventListener('DOMContentLoaded',()=>{renderHistory();switchTab('single');registerOfflineSupport();const input=$('urlInput');input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();triggerSingleScan();}});window.addEventListener('beforeunload',stopQrCamera);});
+    </script>
+</body>
+</html>
